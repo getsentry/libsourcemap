@@ -33,6 +33,8 @@ pub struct MapHead {
     pub names_count: u32,
     pub sources_start: u32,
     pub sources_count: u32,
+    pub source_contents_start: u32,
+    pub source_contents_count: u32,
 }
 
 pub struct MemDb<'a> {
@@ -113,6 +115,19 @@ impl<'a> MemDb<'a> {
         }
     }
 
+    #[inline(always)]
+    fn source_contents(&self) -> &[StringMarker] {
+        let head = self.header();
+        let len = mem::size_of::<StringMarker>() * head.source_contents_count as usize;
+        let off = head.source_contents_start as usize;
+        unsafe {
+            slice::from_raw_parts(
+                mem::transmute(self.buffer()[off..off + len].as_ptr()),
+                head.source_contents_count as usize
+            )
+        }
+    }
+
     pub fn get_name(&self, name_id: u32) -> Option<&str> {
         self.names().get(name_id as usize).and_then(|m| {
             from_utf8(&self.buffer()[m.pos as usize..(m.pos + m.len) as usize]).ok()
@@ -121,6 +136,12 @@ impl<'a> MemDb<'a> {
 
     pub fn get_source(&self, src_id: u32) -> Option<&str> {
         self.sources().get(src_id as usize).and_then(|m| {
+            from_utf8(&self.buffer()[m.pos as usize..(m.pos + m.len) as usize]).ok()
+        })
+    }
+
+    pub fn get_source_contents(&self, src_id: u32) -> Option<&str> {
+        self.source_contents().get(src_id as usize).and_then(|m| {
             from_utf8(&self.buffer()[m.pos as usize..(m.pos + m.len) as usize]).ok()
         })
     }
@@ -266,6 +287,8 @@ pub fn sourcemap_to_memdb<W: Write+Seek>(sm: &SourceMap, mut w: W) -> io::Result
         names_count: sm.get_name_count(),
         sources_start: 0,
         sources_count: sm.get_source_count(),
+        source_contents_start: 0,
+        source_contents_count: 0,
     };
 
     // this will later be the information where to skip to for the TOCs
@@ -298,6 +321,8 @@ pub fn sourcemap_to_memdb<W: Write+Seek>(sm: &SourceMap, mut w: W) -> io::Result
 
     // write sources
     let mut sources = vec![];
+    let mut source_contents = vec![];
+    let mut have_sources = false;
     for source_id in 0..sm.get_source_count() {
         let source = sm.get_source(source_id).unwrap();
         let to_write = source.as_bytes();
@@ -307,13 +332,35 @@ pub fn sourcemap_to_memdb<W: Write+Seek>(sm: &SourceMap, mut w: W) -> io::Result
             len: to_write.len() as u32,
         });
         idx += to_write.len() as u32;
+
+        if let Some(contents) = sm.get_source_contents(source_id) {
+            let to_write = contents.as_bytes();
+            try!(w.write_all(to_write));
+            have_sources = true;
+            source_contents.push(StringMarker {
+                pos: idx,
+                len: to_write.len() as u32,
+            });
+            idx += to_write.len() as u32;
+        } else {
+            source_contents.push(StringMarker {
+                pos: 0,
+                len: 0
+            });
+        }
     }
 
     // write indexes
     head.names_start = idx;
     idx += try!(write_slice(&mut w, &names));
     head.sources_start = idx;
-    try!(write_slice(&mut w, &sources));
+    idx += try!(write_slice(&mut w, &sources));
+
+    if have_sources {
+        head.source_contents_start = idx;
+        head.source_contents_count = source_contents.len() as u32;
+        try!(write_slice(&mut w, &source_contents));
+    }
 
     // write offsets
     try!(w.seek(SeekFrom::Start(0)));

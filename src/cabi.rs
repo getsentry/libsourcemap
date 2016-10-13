@@ -3,7 +3,7 @@ use std::mem;
 use std::slice;
 use std::os::raw::{c_int, c_uint};
 
-use unified::{View, TokenMatch};
+use unified::View;
 
 
 #[no_mangle]
@@ -49,6 +49,17 @@ pub unsafe fn lsm_view_lookup_token(view: *const View, line: u32, col: u32,
             *src_out = tm.src.as_ptr();
             *src_id_out = tm.src_id;
             1
+        }
+    }
+}
+
+#[no_mangle]
+pub unsafe fn lsm_view_get_source_contents(view: *const View, src_id: u32, len_out: *mut u32) -> *const u8 {
+    match (*view).get_source_contents(src_id) {
+        None => ptr::null(),
+        Some(contents) => {
+            *len_out = contents.len() as u32;
+            contents.as_ptr()
         }
     }
 }

@@ -84,7 +84,10 @@ impl View {
         None
     }
 
-    pub fn get_sourcecode(&self, src_id: u32) -> Option<&str> {
-        None
+    pub fn get_source_contents(&self, src_id: u32) -> Option<&str> {
+        match self.map {
+            MapRepr::Json(ref sm) => sm.get_source_contents(src_id),
+            MapRepr::Mem(ref db) => db.get_source_contents(src_id),
+        }
     }
 }
