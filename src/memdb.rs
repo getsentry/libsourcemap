@@ -4,6 +4,7 @@ use std::fmt;
 use std::slice;
 use std::io;
 use std::io::{Write, Seek, SeekFrom};
+use std::borrow::Cow;
 
 use sourcemap::{RawToken, SourceMap};
 
@@ -35,10 +36,7 @@ pub struct MapHead {
 }
 
 pub struct MemDb<'a> {
-    index: &'a [IndexItem],
-    buffer: &'a [u8],
-    names: &'a [StringMarker],
-    sources: &'a [StringMarker],
+    buffer: Cow<'a, [u8]>,
 }
 
 pub struct Token<'a> {
@@ -49,54 +47,92 @@ pub struct Token<'a> {
 
 impl<'a> MemDb<'a> {
 
-    pub fn new(buffer: &'a [u8]) -> MemDb<'a> {
-        let head_size = mem::size_of::<MapHead>();
-        let head : &MapHead = unsafe {
-            mem::transmute(buffer[0..head_size].as_ptr())
-        };
-
-        let index_len = mem::size_of::<IndexItem>() * head.index_size as usize;
-        let names_len = mem::size_of::<StringMarker>() * head.names_count as usize;
-        let sources_len = mem::size_of::<StringMarker>() * head.sources_count as usize;
-
-        let index : &[IndexItem] = unsafe {
-            slice::from_raw_parts(
-                mem::transmute(buffer[head_size..index_len].as_ptr()),
-                head.index_size as usize
-            )
-        };
-
-        let names : &[StringMarker] = unsafe {
-            let off = head.names_start as usize;
-            slice::from_raw_parts(
-                mem::transmute(buffer[off..off + names_len].as_ptr()),
-                head.names_count as usize
-            )
-        };
-
-        let sources : &[StringMarker] = unsafe {
-            let off = head.sources_start as usize;
-            slice::from_raw_parts(
-                mem::transmute(buffer[off..off + sources_len].as_ptr()),
-                head.sources_count as usize
-            )
-        };
-
+    pub fn from_cow(cow: Cow<'a, [u8]>) -> MemDb<'a> {
         MemDb {
-            index: index,
-            buffer: buffer,
-            names: names,
-            sources: sources,
+            buffer: cow,
         }
     }
 
+    pub fn from_slice(buffer: &'a [u8]) -> MemDb<'a> {
+        MemDb::from_cow(Cow::Borrowed(buffer))
+    }
+
+    pub fn from_vec(buffer: Vec<u8>) -> MemDb<'a> {
+        MemDb::from_cow(Cow::Owned(buffer))
+    }
+
+    #[inline(always)]
+    fn buffer(&self) -> &[u8] {
+        &self.buffer
+    }
+
+    #[inline(always)]
+    fn header(&self) -> &MapHead {
+        let len = mem::size_of::<MapHead>();
+        unsafe {
+            mem::transmute(self.buffer()[0..len].as_ptr())
+        }
+    }
+
+    #[inline(always)]
+    fn index(&self) -> &[IndexItem] {
+        let head = self.header();
+        let len = mem::size_of::<IndexItem>() * head.index_size as usize;
+        let off = mem::size_of::<MapHead>();
+        unsafe {
+            slice::from_raw_parts(
+                mem::transmute(self.buffer()[off..len].as_ptr()),
+                head.index_size as usize
+            )
+        }
+    }
+
+    #[inline(always)]
+    fn names(&self) -> &[StringMarker] {
+        let head = self.header();
+        let len = mem::size_of::<StringMarker>() * head.names_count as usize;
+        let off = head.names_start as usize;
+        unsafe {
+            slice::from_raw_parts(
+                mem::transmute(self.buffer()[off..off + len].as_ptr()),
+                head.names_count as usize
+            )
+        }
+    }
+
+    #[inline(always)]
+    fn sources(&self) -> &[StringMarker] {
+        let head = self.header();
+        let len = mem::size_of::<StringMarker>() * head.sources_count as usize;
+        let off = head.sources_start as usize;
+        unsafe {
+            slice::from_raw_parts(
+                mem::transmute(self.buffer()[off..off + len].as_ptr()),
+                head.sources_count as usize
+            )
+        }
+    }
+
+    pub fn get_name(&self, name_id: u32) -> Option<&str> {
+        self.names().get(name_id as usize).and_then(|m| {
+            from_utf8(&self.buffer()[m.pos as usize..(m.pos + m.len) as usize]).ok()
+        })
+    }
+
+    pub fn get_source(&self, src_id: u32) -> Option<&str> {
+        self.sources().get(src_id as usize).and_then(|m| {
+            from_utf8(&self.buffer()[m.pos as usize..(m.pos + m.len) as usize]).ok()
+        })
+    }
+
     pub fn lookup_token(&self, line: u32, col: u32) -> Option<Token> {
+        let index = self.index();
         let mut low = 0;
-        let mut high = self.index.len();
+        let mut high = index.len();
 
         while low < high {
             let mid = (low + high) / 2;
-            let ii = &self.index[mid as usize];
+            let ii = &index[mid as usize];
             if (line, col) < (ii.line, ii.col) {
                 high = mid;
             } else {
@@ -105,7 +141,7 @@ impl<'a> MemDb<'a> {
         }
 
         if low > 0 {
-            let ii = &self.index[low as usize];
+            let ii = &index[low as usize];
             Some(Token {
                 db: self,
                 raw: RawToken {
@@ -120,22 +156,6 @@ impl<'a> MemDb<'a> {
         } else {
             None
         }
-    }
-
-    pub fn get_source(&self, src_id: u32) -> Option<&str> {
-        self.sources.get(src_id as usize).and_then(|marker| {
-            let bytes = &self.buffer[
-                marker.pos as usize..(marker.pos + marker.len) as usize];
-            from_utf8(bytes).ok()
-        })
-    }
-
-    pub fn get_name(&self, name_id: u32) -> Option<&str> {
-        self.names.get(name_id as usize).and_then(|marker| {
-            let bytes = &self.buffer[
-                marker.pos as usize..(marker.pos + marker.len) as usize];
-            from_utf8(bytes).ok()
-        })
     }
 }
 
