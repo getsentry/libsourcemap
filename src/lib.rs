@@ -1,8 +1,5 @@
 extern crate sourcemap;
 
+// in memory sourcemap support
 mod memdb;
-mod writer;
-mod types;
-
-pub use writer::serialize_map;
-pub use memdb::{MemDb, Token};
+pub use memdb::{MemDb, Token, sourcemap_to_memdb};

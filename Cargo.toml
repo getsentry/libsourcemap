@@ -1,7 +1,11 @@
 [package]
-name = "sourcemap-db"
+name = "libsourcemap"
 version = "0.1.0"
 authors = ["Armin Ronacher <armin.ronacher@active-4.com>"]
+
+[lib]
+name = "libsourcemap"
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 sourcemap = { git = "https://github.com/mitsuhiko/rust-sourcemap" }
