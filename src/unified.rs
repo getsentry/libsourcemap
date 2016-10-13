@@ -15,6 +15,8 @@ pub struct View {
     map: MapRepr,
 }
 
+#[derive(Debug)]
+#[repr(C)]
 pub struct TokenMatch<'a> {
     pub line: u32,
     pub col: u32,
