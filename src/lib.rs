@@ -5,4 +5,4 @@ mod writer;
 mod types;
 
 pub use writer::serialize_map;
-pub use memdb::MemDb;
+pub use memdb::{MemDb, Token};

@@ -94,6 +94,22 @@ impl<'a> MemDb<'a> {
             None
         }
     }
+
+    pub fn get_source(&self, src_id: u32) -> Option<&str> {
+        self.sources.get(src_id as usize).and_then(|marker| {
+            let bytes = &self.buffer[
+                marker.pos as usize..(marker.pos + marker.len) as usize];
+            from_utf8(bytes).ok()
+        })
+    }
+
+    pub fn get_name(&self, name_id: u32) -> Option<&str> {
+        self.names.get(name_id as usize).and_then(|marker| {
+            let bytes = &self.buffer[
+                marker.pos as usize..(marker.pos + marker.len) as usize];
+            from_utf8(bytes).ok()
+        })
+    }
 }
 
 impl<'a> Token<'a> {
@@ -130,20 +146,12 @@ impl<'a> Token<'a> {
 
     /// get the source if it exists as string
     pub fn get_source(&self) -> &str {
-        self.db.sources.get(self.raw.src_id as usize).and_then(|marker| {
-            let bytes = &self.db.buffer[
-                marker.pos as usize..(marker.pos + marker.len) as usize];
-            from_utf8(bytes).ok()
-        }).unwrap_or("")
+        self.db.get_source(self.raw.src_id).unwrap_or("")
     }
 
     /// get the name if it exists as string
     pub fn get_name(&self) -> Option<&str> {
-        self.db.names.get(self.raw.name_id as usize).and_then(|marker| {
-            let bytes = &self.db.buffer[
-                marker.pos as usize..(marker.pos + marker.len) as usize];
-            from_utf8(bytes).ok()
-        })
+        self.db.get_name(self.raw.src_id)
     }
 
     /// returns `true` if a name exists, `false` otherwise
