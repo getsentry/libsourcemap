@@ -9,3 +9,4 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 sourcemap = { git = "https://github.com/mitsuhiko/rust-sourcemap" }
+error-chain = "0.5.0"

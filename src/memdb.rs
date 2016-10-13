@@ -62,7 +62,7 @@ impl<'a> MemDb<'a> {
     }
 
     #[inline(always)]
-    fn buffer(&self) -> &[u8] {
+    pub fn buffer(&self) -> &[u8] {
         &self.buffer
     }
 
@@ -125,7 +125,7 @@ impl<'a> MemDb<'a> {
         })
     }
 
-    pub fn lookup_token(&self, line: u32, col: u32) -> Option<Token> {
+    pub fn lookup_token(&'a self, line: u32, col: u32) -> Option<Token<'a>> {
         let index = self.index();
         let mut low = 0;
         let mut high = index.len();
@@ -192,12 +192,12 @@ impl<'a> Token<'a> {
     }
 
     /// get the source if it exists as string
-    pub fn get_source(&self) -> &str {
+    pub fn get_source(&self) -> &'a str {
         self.db.get_source(self.raw.src_id).unwrap_or("")
     }
 
     /// get the name if it exists as string
-    pub fn get_name(&self) -> Option<&str> {
+    pub fn get_name(&self) -> Option<&'a str> {
         self.db.get_name(self.raw.src_id)
     }
 
