@@ -5,4 +5,3 @@ authors = ["Armin Ronacher <armin.ronacher@active-4.com>"]
 
 [dependencies]
 sourcemap = { git = "https://github.com/mitsuhiko/rust-sourcemap" }
-redis = "0.7.0"
