@@ -1,2 +1,7 @@
 target
 Cargo.lock
+*.egg-info
+.eggs
+dist
+build
+venv
