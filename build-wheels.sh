@@ -39,7 +39,8 @@ fi
 # In case we would want multiple builds in the future we would need to delete
 # .eggs and build between the builds.
 if [ x$LIBSOURCEMAP_MANYLINUX == x1 ]; then
-  for py in cp27-cp27mu cp33-cp33m cp34-cp34m cp35-cp35m; do
+  #for py in cp27-cp27mu cp33-cp33m cp34-cp34m cp35-cp35m; do
+  for py in cp27-cp27mu; do
     pybin="/opt/python/$py/bin"
     $pybin/pip install wheel
     $pybin/python setup.py bdist_wheel $WHEEL_OPTIONS
