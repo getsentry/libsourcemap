@@ -16,6 +16,7 @@ Token = namedtuple('Token', ['dst_line', 'dst_col', 'src', 'src_line',
 
 @implements_to_string
 class SourcemapError(Exception):
+    """Raised if something goes wrong with sourcemap processing."""
 
     def __init__(self, message):
         self.message = message
@@ -47,12 +48,21 @@ def decode_rust_str(ptr, len):
 
 
 class View(object):
+    """Provides a view of a sourcemap.  This can come from two sources:
+
+    * real JSON sourcemaps.  This currently only loads sourcemaps that are
+      not indexed.  An indexed sourcemap will raise a `SourcemapError`.
+    * preprocessed MemDB sourcemaps.  These are slightly larger (uncompressed)
+      than a real sourcemap but can be seeked in without parsing.  This is the
+      preferred format for caching.
+    """
 
     def __init__(self):
         raise TypeError('Cannot instanciate views')
 
     @staticmethod
     def from_json(buffer):
+        """Creates a sourcemap view from a JSON string."""
         buffer = to_bytes(buffer)
         with capture_err() as (err_out, check):
             return View._from_ptr(check(_lib.lsm_view_from_json(
@@ -60,6 +70,7 @@ class View(object):
 
     @staticmethod
     def from_memdb(buffer):
+        """Creates a sourcemap view from MemDB bytes."""
         buffer = to_bytes(buffer)
         with capture_err() as (err_out, check):
             return View._from_ptr(check(_lib.lsm_view_from_memdb(
@@ -72,6 +83,7 @@ class View(object):
         return rv
 
     def dump_memdb(self):
+        """Dumps a sourcemap in MemDB format into bytes."""
         len_out = _ffi.new('unsigned int *')
         buf = _lib.lsm_view_dump_memdb(self._ptr, len_out)
         try:
@@ -81,6 +93,9 @@ class View(object):
         return rv
 
     def lookup_token(self, line, col):
+        """Given a minified location, this tries to locate the closest
+        token that is a match.  Returns `None` if no match can be found.
+        """
         # Silently ignore underflows
         if line < 0 or col < 0:
             return None
@@ -98,6 +113,9 @@ class View(object):
             )
 
     def get_source_contents(self, src_id):
+        """Given a source ID this returns the embedded sourcecode if there is.
+        The sourcecode is returned as UTF-8 bytes for more efficient processing.
+        """
         len_out = _ffi.new('unsigned int *')
         rv = _lib.lsm_view_get_source_contents(self._ptr, src_id, len_out)
         if rv:
