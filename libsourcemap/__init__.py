@@ -1,4 +1,10 @@
-from ._highlevel import View, Token, SourcemapError
+from ._highlevel import View, Token
+from .exceptions import SourceMapError, IndexedSourceMap, BadJson
 
+__all__ = [
+    # General stuff
+    'View', 'Token',
 
-__all__ = ['View', 'Token', 'SourcemapError']
+    # Exceptions
+    'SourceMapError', 'IndexedSourceMap', 'BadJson'
+]

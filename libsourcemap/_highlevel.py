@@ -4,7 +4,8 @@ from contextlib import contextmanager
 from collections import namedtuple
 
 from ._sourcemapnative import ffi as _ffi
-from ._compat import to_bytes, implements_to_string
+from ._compat import to_bytes
+from .exceptions import SourceMapError, special_errors
 
 
 _lib = _ffi.dlopen(os.path.join(os.path.dirname(__file__), '_libsourcemap.so'))
@@ -14,17 +15,6 @@ Token = namedtuple('Token', ['dst_line', 'dst_col', 'src', 'src_line',
                              'src_col', 'src_id', 'name'])
 
 
-@implements_to_string
-class SourcemapError(Exception):
-    """Raised if something goes wrong with sourcemap processing."""
-
-    def __init__(self, message):
-        self.message = message
-
-    def __str__(self):
-        return self.message.encode('utf-8')
-
-
 @contextmanager
 def capture_err():
     err = _ffi.new('lsm_error_t *')
@@ -32,8 +22,8 @@ def capture_err():
         if rv:
             return rv
         try:
-            exc = SourcemapError(_ffi.string(err[0].message)
-                                 .decode('utf-8', 'replace'))
+            cls = special_errors.get(err[0].code, SourceMapError)
+            exc = cls(_ffi.string(err[0].message).decode('utf-8', 'replace'))
         finally:
             _lib.lsm_buffer_free(err[0].message)
         raise exc

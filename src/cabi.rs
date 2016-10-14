@@ -3,7 +3,8 @@ use std::mem;
 use std::slice;
 use std::os::raw::{c_int, c_uint};
 
-use errors::Error;
+use sourcemap::Error as SourceMapError;
+use errors::{Error, ErrorKind};
 use unified::View;
 
 
@@ -27,12 +28,20 @@ pub struct CError {
     pub code: c_int,
 }
 
+fn get_error_code_from_kind(kind: &ErrorKind) -> c_int {
+    match *kind {
+        ErrorKind::SourceMapError(SourceMapError::IndexedSourcemap) => 2,
+        ErrorKind::SourceMapError(SourceMapError::BadJson(_, _, _)) => 3,
+        _ => 1,
+    }
+}
+
 
 unsafe fn notify_err<T>(err: Error, err_out: *mut CError) -> *mut T {
     if !err_out.is_null() {
         let s = format!("{}\x00", err);
         (*err_out).message = Box::into_raw(s.into_boxed_str()) as *mut u8;
-        (*err_out).code = 0;
+        (*err_out).code = get_error_code_from_kind(err.kind());
     }
     0 as *mut T
 }
