@@ -3,18 +3,22 @@
 
 typedef void lsm_view_t;
 
+typedef struct lsm_token_s {
+    unsigned int line;
+    unsigned int col;
+    const char *name;
+    unsigned int name_len;
+    const char *src;
+    unsigned int src_len;
+    unsigned int src_id;
+} lsm_token_t;
+
 lsm_view_t *lsm_view_from_json(char *bytes, unsigned int len, char **err_out);
 lsm_view_t *lsm_view_from_memdb(char *bytes, unsigned int len, char **err_out);
 void lsm_view_free(lsm_view_t *view);
 
 int lsm_view_lookup_token(const lsm_view_t *view, unsigned int line,
-                          unsigned int col, unsigned int *src_line_out,
-                          unsigned int *src_col_out,
-                          const char **name_out,
-                          unsigned int *name_len_out,
-                          const char **src_out,
-                          unsigned int *src_len_out,
-                          unsigned int *src_it_out);
+                          unsigned int col, lsm_token_t *tok_out);
 const char *lsm_view_get_source_contents(const lsm_view_t *view,
                                          unsigned int src_id,
                                          unsigned int *len_out);

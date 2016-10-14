@@ -7,6 +7,19 @@ use errors::Error;
 use unified::View;
 
 
+#[derive(Debug)]
+#[repr(C)]
+pub struct Token {
+    pub line: c_uint,
+    pub col: c_uint,
+    pub name: *const u8,
+    pub name_len: c_uint,
+    pub src: *const u8,
+    pub src_len: c_uint,
+    pub src_id: c_uint,
+}
+
+
 unsafe fn notify_err<T>(err: Error, err_out: *mut *mut u8) -> *mut T {
     if !err_out.is_null() {
         let s = format!("{}\x00", err);
@@ -46,27 +59,21 @@ pub unsafe fn lsm_view_free(view: *mut View) {
 }
 
 #[no_mangle]
-pub unsafe fn lsm_view_lookup_token(view: *const View, line: u32, col: u32,
-                                    src_line_out: *mut u32,
-                                    src_col_out: *mut u32,
-                                    name_out: *mut *const u8,
-                                    name_len_out: *mut u32,
-                                    src_out: *mut *const u8,
-                                    src_len_out: *mut u32,
-                                    src_id_out: *mut u32) -> c_int {
+pub unsafe fn lsm_view_lookup_token(view: *const View, line: c_uint, col: c_uint,
+                                    out: *mut Token) -> c_int {
     match (*view).lookup_token(line, col) {
         None => 0,
         Some(tm) => {
-            *src_line_out = tm.line;
-            *src_col_out = tm.col;
-            *name_out = match tm.name {
+            (*out).line = tm.line;
+            (*out).col = tm.col;
+            (*out).name = match tm.name {
                 Some(name) => name.as_ptr(),
                 None => ptr::null()
             };
-            *name_len_out = tm.name.map(|x| x.as_bytes().len()).unwrap_or(0) as u32;
-            *src_out = tm.src.as_ptr();
-            *src_len_out = tm.src.as_bytes().len() as u32;
-            *src_id_out = tm.src_id;
+            (*out).name_len = tm.name.map(|x| x.as_bytes().len()).unwrap_or(0) as c_uint;
+            (*out).src = tm.src.as_ptr();
+            (*out).src_len = tm.src.as_bytes().len() as c_uint;
+            (*out).src_id = tm.src_id;
             1
         }
     }

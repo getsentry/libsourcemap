@@ -40,6 +40,11 @@ def capture_err():
         pass
 
 
+def decode_rust_str(ptr, len):
+    if ptr:
+        return _ffi.unpack(ptr, len).decode('utf-8', 'replace')
+
+
 class View(object):
 
     def __init__(self):
@@ -75,23 +80,18 @@ class View(object):
         return rv
 
     def lookup_token(self, line, col):
-        src_line_out = _ffi.new('unsigned int *')
-        src_col_out = _ffi.new('unsigned int *')
-        name_out = _ffi.new('char **')
-        name_len_out = _ffi.new('unsigned int *')
-        src_out = _ffi.new('char **')
-        src_len_out = _ffi.new('unsigned int *')
-        src_id_out = _ffi.new('unsigned int *')
-        if _lib.lsm_view_lookup_token(self._ptr, line, col, src_line_out,
-                                      src_col_out, name_out, name_len_out,
-                                      src_out, src_len_out, src_id_out):
+        # Silently ignore underflows
+        if line < 0 or col < 0:
+            return None
+        tok_out = _ffi.new('lsm_token_t *')
+        if _lib.lsm_view_lookup_token(self._ptr, line, col, tok_out):
+            tok = tok_out[0]
             return Token(
-                src_line_out[0],
-                src_col_out[0],
-                src_id_out[0],
-                _ffi.unpack(src_out[0], src_len_out[0]).decode('utf-8', 'replace'),
-                _ffi.unpack(name_out[0], name_len_out[0]).decode('utf-8', 'replace')
-                    if name_out[0] else None
+                tok.line,
+                tok.col,
+                tok.src_id,
+                decode_rust_str(tok.src, tok.src_len),
+                decode_rust_str(tok.name, tok.name_len)
             )
 
     def get_source_contents(self, src_id):
