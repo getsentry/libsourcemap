@@ -27,14 +27,15 @@ class SourcemapError(Exception):
 
 @contextmanager
 def capture_err():
-    err = _ffi.new('char **')
+    err = _ffi.new('lsm_error_t *')
     def check(rv):
         if rv:
             return rv
         try:
-            exc = SourcemapError(_ffi.string(err[0]).decode('utf-8', 'replace'))
+            exc = SourcemapError(_ffi.string(err[0].message)
+                                 .decode('utf-8', 'replace'))
         finally:
-            _lib.lsm_buffer_free(err[0])
+            _lib.lsm_buffer_free(err[0].message)
         raise exc
     try:
         yield err, check

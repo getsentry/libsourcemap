@@ -20,16 +20,25 @@ pub struct Token {
 }
 
 
-unsafe fn notify_err<T>(err: Error, err_out: *mut *mut u8) -> *mut T {
+#[derive(Debug)]
+#[repr(C)]
+pub struct CError {
+    pub message: *const u8,
+    pub code: c_int,
+}
+
+
+unsafe fn notify_err<T>(err: Error, err_out: *mut CError) -> *mut T {
     if !err_out.is_null() {
         let s = format!("{}\x00", err);
-        *err_out = Box::into_raw(s.into_boxed_str()) as *mut u8;
+        (*err_out).message = Box::into_raw(s.into_boxed_str()) as *mut u8;
+        (*err_out).code = 0;
     }
     0 as *mut T
 }
 
 #[no_mangle]
-pub unsafe fn lsm_view_from_json(bytes: *const u8, len: c_uint, err_out: *mut *mut u8) -> *mut View {
+pub unsafe fn lsm_view_from_json(bytes: *const u8, len: c_uint, err_out: *mut CError) -> *mut View {
     match View::json_from_slice(slice::from_raw_parts(
         mem::transmute(bytes),
         len as usize
@@ -40,7 +49,7 @@ pub unsafe fn lsm_view_from_json(bytes: *const u8, len: c_uint, err_out: *mut *m
 }
 
 #[no_mangle]
-pub unsafe fn lsm_view_from_memdb(bytes: *const u8, len: c_uint, err_out: *mut *mut u8) -> *mut View {
+pub unsafe fn lsm_view_from_memdb(bytes: *const u8, len: c_uint, err_out: *mut CError) -> *mut View {
     // XXX: this currently copies because that's safer.  Consider improving this?
     match View::memdb_from_vec(slice::from_raw_parts(
         mem::transmute(bytes),

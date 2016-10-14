@@ -13,8 +13,13 @@ typedef struct lsm_token_s {
     unsigned int src_id;
 } lsm_token_t;
 
-lsm_view_t *lsm_view_from_json(char *bytes, unsigned int len, char **err_out);
-lsm_view_t *lsm_view_from_memdb(char *bytes, unsigned int len, char **err_out);
+typedef struct lsm_error_s {
+    char *message;
+    int code;
+} lsm_error_t;
+
+lsm_view_t *lsm_view_from_json(char *bytes, unsigned int len, lsm_error_t *err);
+lsm_view_t *lsm_view_from_memdb(char *bytes, unsigned int len, lsm_error_t *err);
 void lsm_view_free(lsm_view_t *view);
 
 int lsm_view_lookup_token(const lsm_view_t *view, unsigned int line,
