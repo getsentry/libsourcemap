@@ -12,7 +12,12 @@ clean-docker:
 	docker rmi -f libsourcemap:dev32
 	docker rmi -f libsourcemap:dev64
 
+mac-wheels:
+	SYMSYND_MACWHEELS=1 ./build-wheels.sh
+
 manylinux-wheels:
 	SYMSYND_MANYLINUX=1 ./docker-build.sh
 
-.PHONY: build develop wheel clean-docker manylinux-wheels
+all-wheels: mac-wheels manylinux-wheels
+
+.PHONY: build develop wheel clean-docker mac-wheels manylinux-wheels all-wheels

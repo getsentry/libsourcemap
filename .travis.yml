@@ -13,6 +13,6 @@ addons:
 
 install:
   - curl https://sh.rustup.rs -sSf | sh -s -- -y
-  - "export PATH=${HOME/.cargo/.bin:${PATH}"
+  - export PATH="${HOME/.cargo/.bin:${PATH}"
   - pip install wheel
   - make develop
