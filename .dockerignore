@@ -1,0 +1,8 @@
+.git
+.cache
+.dockerignore
+docker-build.sh
+build
+dist
+libsourcemap/*.so
+target
