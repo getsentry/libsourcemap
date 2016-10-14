@@ -76,14 +76,12 @@ impl<'a> MemDb<'a> {
     }
 
     #[inline(always)]
-    fn slice_buffer<T>(&self, start: usize, len: usize) -> Result<&T> {
+    fn get_data(&self, start: usize, len: usize) -> Result<&[u8]> {
         let end = start.wrapping_add(len);
         if end < start || end > self.buffer.len() {
             Err(ErrorKind::BadMemDb.into())
         } else {
-            Ok(unsafe {
-                mem::transmute(self.buffer[start..end].as_ptr())
-            })
+            Ok(&self.buffer[start..end])
         }
     }
 
@@ -92,15 +90,27 @@ impl<'a> MemDb<'a> {
         let size = mem::size_of::<T>();
         Ok(unsafe {
             slice::from_raw_parts(
-                try!(self.slice_buffer(offset, count * size)),
+                mem::transmute(try!(self.get_data(offset, count * size)).as_ptr()),
                 count
             )
         })
     }
 
+    fn get_string(&self, coll: &[StringMarker], idx: u32) -> Option<&str> {
+        if let Some(m) = coll.get(idx as usize) {
+            match self.get_data(m.pos as usize, m.len as usize) {
+                Ok(bytes) => { return from_utf8(bytes).ok(); }
+                Err(_) => { return None; }
+            };
+        }
+        None
+    }
+
     #[inline(always)]
     fn header(&self) -> Result<&MapHead> {
-        Ok(try!(self.slice_buffer(0, mem::size_of::<MapHead>())))
+        unsafe {
+            Ok(mem::transmute(try!(self.get_data(0, mem::size_of::<MapHead>())).as_ptr()))
+        }
     }
 
     #[inline(always)]
@@ -132,24 +142,15 @@ impl<'a> MemDb<'a> {
     }
 
     pub fn get_name(&self, name_id: u32) -> Option<&str> {
-        self.names().ok().and_then(|x| x.get(name_id as usize)).and_then(|m| {
-            // XXX: range check
-            from_utf8(&self.buffer()[m.pos as usize..(m.pos + m.len) as usize]).ok()
-        })
+        self.names().ok().and_then(|x| self.get_string(x, name_id))
     }
 
     pub fn get_source(&self, src_id: u32) -> Option<&str> {
-        self.sources().ok().and_then(|x| x.get(src_id as usize)).and_then(|m| {
-            // XXX: range check
-            from_utf8(&self.buffer()[m.pos as usize..(m.pos + m.len) as usize]).ok()
-        })
+        self.sources().ok().and_then(|x| self.get_string(x, src_id))
     }
 
     pub fn get_source_contents(&self, src_id: u32) -> Option<&str> {
-        self.source_contents().ok().and_then(|x| x.get(src_id as usize)).and_then(|m| {
-            // XXX: range check
-            from_utf8(&self.buffer()[m.pos as usize..(m.pos + m.len) as usize]).ok()
-        })
+        self.source_contents().ok().and_then(|x| self.get_string(x, src_id))
     }
 
     pub fn lookup_token(&'a self, line: u32, col: u32) -> Option<Token<'a>> {
