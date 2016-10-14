@@ -22,6 +22,9 @@ lsm_view_t *lsm_view_from_json(char *bytes, unsigned int len, lsm_error_t *err);
 lsm_view_t *lsm_view_from_memdb(char *bytes, unsigned int len, lsm_error_t *err);
 void lsm_view_free(lsm_view_t *view);
 
+unsigned int lsm_view_get_token_count(const lsm_view_t *view);
+unsigned int lsm_view_get_token(const lsm_view_t *view, unsigned int idx,
+                                lsm_token_t *tok_out);
 int lsm_view_lookup_token(const lsm_view_t *view, unsigned int line,
                           unsigned int col, lsm_token_t *tok_out);
 const char *lsm_view_get_source_contents(const lsm_view_t *view,

@@ -5,7 +5,7 @@ use std::os::raw::{c_int, c_uint};
 
 use sourcemap::Error as SourceMapError;
 use errors::{Error, ErrorKind};
-use unified::View;
+use unified::{View, TokenMatch};
 
 
 #[derive(Debug)]
@@ -35,6 +35,19 @@ fn get_error_code_from_kind(kind: &ErrorKind) -> c_int {
         ErrorKind::UnsupportedMemDbVersion => 4,
         _ => 1,
     }
+}
+
+unsafe fn set_token<'a>(out: *mut Token, tm: &'a TokenMatch<'a>) {
+    (*out).line = tm.line;
+    (*out).col = tm.col;
+    (*out).name = match tm.name {
+        Some(name) => name.as_ptr(),
+        None => ptr::null()
+    };
+    (*out).name_len = tm.name.map(|x| x.as_bytes().len()).unwrap_or(0) as c_uint;
+    (*out).src = tm.src.as_ptr();
+    (*out).src_len = tm.src.as_bytes().len() as c_uint;
+    (*out).src_id = tm.src_id;
 }
 
 
@@ -78,21 +91,28 @@ pub unsafe fn lsm_view_free(view: *mut View) {
 }
 
 #[no_mangle]
+pub unsafe fn lsm_view_get_token_count(view: *const View) -> c_uint {
+    (*view).get_token_count() as c_uint
+}
+
+#[no_mangle]
+pub unsafe fn lsm_view_get_token(view: *const View, idx: c_uint, out: *mut Token) -> c_int {
+    match (*view).get_token(idx as u32) {
+        None => 0,
+        Some(tm) => {
+            set_token(out, &tm);
+            1
+        }
+    }
+}
+
+#[no_mangle]
 pub unsafe fn lsm_view_lookup_token(view: *const View, line: c_uint, col: c_uint,
                                     out: *mut Token) -> c_int {
     match (*view).lookup_token(line, col) {
         None => 0,
         Some(tm) => {
-            (*out).line = tm.line;
-            (*out).col = tm.col;
-            (*out).name = match tm.name {
-                Some(name) => name.as_ptr(),
-                None => ptr::null()
-            };
-            (*out).name_len = tm.name.map(|x| x.as_bytes().len()).unwrap_or(0) as c_uint;
-            (*out).src = tm.src.as_ptr();
-            (*out).src_len = tm.src.as_bytes().len() as c_uint;
-            (*out).src_id = tm.src_id;
+            set_token(out, &tm);
             1
         }
     }

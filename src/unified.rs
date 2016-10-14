@@ -89,4 +89,39 @@ impl View {
             MapRepr::Mem(ref db) => db.get_source_contents(src_id),
         }
     }
+
+    pub fn get_token_count(&self) -> u32 {
+        match self.map {
+            MapRepr::Json(ref sm) => sm.get_token_count(),
+            MapRepr::Mem(ref db) => db.get_token_count(),
+        }
+    }
+
+    pub fn get_token<'a>(&'a self, idx: u32) -> Option<TokenMatch<'a>> {
+        match self.map {
+            MapRepr::Json(ref sm) => {
+                if let Some(tok) = sm.get_token(idx) {
+                    return Some(TokenMatch {
+                        line: tok.get_src_line(),
+                        col: tok.get_src_col(),
+                        name: tok.get_name(),
+                        src: tok.get_source(),
+                        src_id: tok.get_raw_token().src_id,
+                    });
+                }
+            },
+            MapRepr::Mem(ref db) => {
+                if let Some(tok) = db.get_token(idx) {
+                    return Some(TokenMatch {
+                        line: tok.get_src_line(),
+                        col: tok.get_src_col(),
+                        name: tok.get_name(),
+                        src: tok.get_source(),
+                        src_id: tok.get_raw_token().src_id,
+                    });
+                }
+            }
+        }
+        None
+    }
 }

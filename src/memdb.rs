@@ -83,6 +83,28 @@ impl<'a> MemDb<'a> {
         self.source_contents().ok().and_then(|x| self.get_string(x, src_id))
     }
 
+    pub fn get_token_count(&self) -> u32 {
+        self.header().map(|x| x.index_size).unwrap_or(0)
+    }
+
+    pub fn get_token(&'a self, idx: u32) -> Option<Token<'a>> {
+        self.index().ok().and_then(|index| {
+            (&index.get(idx as usize)).map(|ii| {
+                Token {
+                    db: self,
+                    raw: RawToken {
+                        dst_line: 0,
+                        dst_col: 0,
+                        src_line: ii.line,
+                        src_col: ii.col,
+                        src_id: ii.src_id,
+                        name_id: ii.name_id,
+                    }
+                }
+            })
+        })
+    }
+
     pub fn lookup_token(&'a self, line: u32, col: u32) -> Option<Token<'a>> {
         let index = match self.index() {
             Ok(idx) => idx,
@@ -102,18 +124,7 @@ impl<'a> MemDb<'a> {
         }
 
         if low > 0 {
-            let ii = &index[low as usize];
-            Some(Token {
-                db: self,
-                raw: RawToken {
-                    dst_line: line,
-                    dst_col: col,
-                    src_line: ii.line,
-                    src_col: ii.col,
-                    src_id: ii.src_id,
-                    name_id: ii.name_id,
-                }
-            })
+            self.get_token(low as u32)
         } else {
             None
         }

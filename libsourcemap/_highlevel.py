@@ -38,6 +38,18 @@ def decode_rust_str(ptr, len):
         return _ffi.unpack(ptr, len).decode('utf-8', 'replace')
 
 
+def convert_token(tok, line=0, col=0):
+    return Token(
+        line,
+        col,
+        decode_rust_str(tok.src, tok.src_len),
+        tok.line,
+        tok.col,
+        tok.src_id,
+        decode_rust_str(tok.name, tok.name_len)
+    )
+
+
 class View(object):
     """Provides a view of a sourcemap.  This can come from two sources:
 
@@ -92,16 +104,7 @@ class View(object):
             return None
         tok_out = _ffi.new('lsm_token_t *')
         if _lib.lsm_view_lookup_token(self._ptr, line, col, tok_out):
-            tok = tok_out[0]
-            return Token(
-                line,
-                col,
-                decode_rust_str(tok.src, tok.src_len),
-                tok.line,
-                tok.col,
-                tok.src_id,
-                decode_rust_str(tok.name, tok.name_len)
-            )
+            return convert_token(tok_out[0], line, col)
 
     def get_source_contents(self, src_id):
         """Given a source ID this returns the embedded sourcecode if there is.
@@ -111,6 +114,19 @@ class View(object):
         rv = _lib.lsm_view_get_source_contents(self._ptr, src_id, len_out)
         if rv:
             return _ffi.unpack(rv, len_out[0])
+
+    def __getitem__(self, idx):
+        """Returns a token with a given index."""
+        tok_out = _ffi.new('lsm_token_t *')
+        if _lib.lsm_view_get_token(self._ptr, idx, tok_out):
+            return convert_token(tok_out[0])
+
+    def __len__(self):
+        return _lib.lsm_view_get_token_count(self._ptr)
+
+    def __iter__(self):
+        for idx in xrange(len(self)):
+            yield self[idx]
 
     def __del__(self):
         try:
