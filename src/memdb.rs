@@ -28,6 +28,7 @@ pub struct StringMarker {
 #[derive(Debug, Copy, Clone)]
 #[repr(C, packed)]
 pub struct MapHead {
+    pub version: u32,
     pub index_size: u32,
     pub names_start: u32,
     pub names_count: u32,
@@ -282,6 +283,7 @@ fn write_slice<T, W: Write>(w: &mut W, x: &[T]) -> io::Result<u32> {
 /// Serializes a map into a given writer
 pub fn sourcemap_to_memdb<W: Write+Seek>(sm: &SourceMap, mut w: W) -> io::Result<()> {
     let mut head = MapHead {
+        version: 1,
         index_size: sm.get_index_size() as u32,
         names_start: 0,
         names_count: sm.get_name_count(),

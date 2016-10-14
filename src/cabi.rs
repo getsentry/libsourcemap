@@ -50,7 +50,9 @@ pub unsafe fn lsm_view_lookup_token(view: *const View, line: u32, col: u32,
                                     src_line_out: *mut u32,
                                     src_col_out: *mut u32,
                                     name_out: *mut *const u8,
+                                    name_len_out: *mut u32,
                                     src_out: *mut *const u8,
+                                    src_len_out: *mut u32,
                                     src_id_out: *mut u32) -> c_int {
     match (*view).lookup_token(line, col) {
         None => 0,
@@ -61,7 +63,9 @@ pub unsafe fn lsm_view_lookup_token(view: *const View, line: u32, col: u32,
                 Some(name) => name.as_ptr(),
                 None => ptr::null()
             };
+            *name_len_out = tm.name.map(|x| x.as_bytes().len()).unwrap_or(0) as u32;
             *src_out = tm.src.as_ptr();
+            *src_len_out = tm.src.as_bytes().len() as u32;
             *src_id_out = tm.src_id;
             1
         }
