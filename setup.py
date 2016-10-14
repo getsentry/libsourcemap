@@ -17,6 +17,7 @@ else:
 from setuptools import setup, find_packages
 from distutils.command.build_py import build_py
 from distutils.command.build_ext import build_ext
+from setuptools.dist import Distribution
 
 
 # Build with clang if not otherwise specified.
@@ -61,6 +62,14 @@ class CustomBuildExt(build_ext):
             build_libsourcemap(build_py.get_package_dir(PACKAGE))
 
 
+class BinaryDistribution(Distribution):
+    """This is necessary because otherwise the wheel does not know that
+    we have non pure information.
+    """
+    def has_ext_modules(foo):
+        return True
+
+
 setup(
     name='libsourcemap',
     version='0.1.0',
@@ -92,4 +101,6 @@ setup(
         'Topic :: Internet :: WWW/HTTP :: Dynamic Content',
         'Topic :: Software Development :: Libraries :: Python Modules'
     ],
+    ext_modules=[],
+    distclass=BinaryDistribution
 )

@@ -46,6 +46,7 @@ if [ x$LIBSOURCEMAP_MANYLINUX == x1 ]; then
   done
 
   echo "Auditing wheels"
+  ls -alh dist
   for wheel in dist/*-linux_*.whl; do
     auditwheel repair $wheel -w dist/
     rm $wheel
