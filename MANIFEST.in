@@ -1,0 +1,3 @@
+include MANIFEST.in Makefile LICENSE README.md build.py
+recursive-include include *
+recursive-include src *
