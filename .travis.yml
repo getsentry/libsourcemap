@@ -12,6 +12,7 @@ addons:
     - clang
 
 install:
-  - curl https://static.rust-lang.org/rustup.sh | linux32 sh -s -- --prefix=/usr/local --disable-sudo
+  - curl https://sh.rustup.rs -sSf | sh -s -- -y
+  - "export PATH=${HOME/.cargo/.bin:${PATH}"
   - pip install wheel
   - make develop
