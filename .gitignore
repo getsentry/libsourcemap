@@ -6,3 +6,4 @@ Cargo.lock
 dist
 build
 venv
+libsourcemap/__sourcemapnative.py
