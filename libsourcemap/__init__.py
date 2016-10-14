@@ -1,4 +1,4 @@
-from ._highlevel import View
+from ._highlevel import View, SourcemapError
 
 
-__all__ = ['View']
+__all__ = ['View', 'SourcemapError']
