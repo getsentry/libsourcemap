@@ -71,11 +71,58 @@ impl<'a> MemDb<'a> {
         MemDb::from_cow(Cow::Owned(buffer))
     }
 
+    pub fn get_name(&self, name_id: u32) -> Option<&str> {
+        self.names().ok().and_then(|x| self.get_string(x, name_id))
+    }
+
+    pub fn get_source(&self, src_id: u32) -> Option<&str> {
+        self.sources().ok().and_then(|x| self.get_string(x, src_id))
+    }
+
+    pub fn get_source_contents(&self, src_id: u32) -> Option<&str> {
+        self.source_contents().ok().and_then(|x| self.get_string(x, src_id))
+    }
+
+    pub fn lookup_token(&'a self, line: u32, col: u32) -> Option<Token<'a>> {
+        let index = match self.index() {
+            Ok(idx) => idx,
+            Err(_) => { return None; }
+        };
+        let mut low = 0;
+        let mut high = index.len();
+
+        while low < high {
+            let mid = (low + high) / 2;
+            let ii = &index[mid as usize];
+            if (line, col) < (ii.line, ii.col) {
+                high = mid;
+            } else {
+                low = mid + 1;
+            }
+        }
+
+        if low > 0 {
+            let ii = &index[low as usize];
+            Some(Token {
+                db: self,
+                raw: RawToken {
+                    dst_line: line,
+                    dst_col: col,
+                    src_line: ii.line,
+                    src_col: ii.col,
+                    src_id: ii.src_id,
+                    name_id: ii.name_id,
+                }
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn buffer(&self) -> &[u8] {
         &self.buffer
     }
 
-    #[inline(always)]
     fn get_data(&self, start: usize, len: usize) -> Result<&[u8]> {
         let end = start.wrapping_add(len);
         if end < start || end > self.buffer.len() {
@@ -85,7 +132,6 @@ impl<'a> MemDb<'a> {
         }
     }
 
-    #[inline(always)]
     fn get_slice<T>(&self, offset: usize, count: usize) -> Result<&[T]> {
         let size = mem::size_of::<T>();
         Ok(unsafe {
@@ -139,54 +185,6 @@ impl<'a> MemDb<'a> {
         let head = try!(self.header());
         let off = head.source_contents_start as usize;
         self.get_slice(off, head.source_contents_count as usize)
-    }
-
-    pub fn get_name(&self, name_id: u32) -> Option<&str> {
-        self.names().ok().and_then(|x| self.get_string(x, name_id))
-    }
-
-    pub fn get_source(&self, src_id: u32) -> Option<&str> {
-        self.sources().ok().and_then(|x| self.get_string(x, src_id))
-    }
-
-    pub fn get_source_contents(&self, src_id: u32) -> Option<&str> {
-        self.source_contents().ok().and_then(|x| self.get_string(x, src_id))
-    }
-
-    pub fn lookup_token(&'a self, line: u32, col: u32) -> Option<Token<'a>> {
-        let index = match self.index() {
-            Ok(idx) => idx,
-            Err(_) => { return None; }
-        };
-        let mut low = 0;
-        let mut high = index.len();
-
-        while low < high {
-            let mid = (low + high) / 2;
-            let ii = &index[mid as usize];
-            if (line, col) < (ii.line, ii.col) {
-                high = mid;
-            } else {
-                low = mid + 1;
-            }
-        }
-
-        if low > 0 {
-            let ii = &index[low as usize];
-            Some(Token {
-                db: self,
-                raw: RawToken {
-                    dst_line: line,
-                    dst_col: col,
-                    src_line: ii.line,
-                    src_col: ii.col,
-                    src_id: ii.src_id,
-                    name_id: ii.name_id,
-                }
-            })
-        } else {
-            None
-        }
     }
 }
 
