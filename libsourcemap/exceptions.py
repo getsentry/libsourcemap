@@ -20,7 +20,12 @@ class BadJson(SourceMapError):
     """Raised if bad JSON data was encountered."""
 
 
+class UnsupportedMemDbVersion(SourceMapError):
+    """Raised if an unsupported memdb is loaded."""
+
+
 special_errors = {
     2: IndexedSourceMap,
     3: BadJson,
+    4: UnsupportedMemDbVersion,
 }

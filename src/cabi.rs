@@ -32,6 +32,7 @@ fn get_error_code_from_kind(kind: &ErrorKind) -> c_int {
     match *kind {
         ErrorKind::SourceMapError(SourceMapError::IndexedSourcemap) => 2,
         ErrorKind::SourceMapError(SourceMapError::BadJson(_, _, _)) => 3,
+        ErrorKind::UnsupportedMemDbVersion => 4,
         _ => 1,
     }
 }

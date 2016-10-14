@@ -39,7 +39,7 @@ impl View {
 
     pub fn memdb_from_vec(vec: Vec<u8>) -> Result<View> {
         Ok(View {
-            map: MapRepr::Mem(MemDb::from_vec(vec))
+            map: MapRepr::Mem(try!(MemDb::from_vec(vec)))
         })
     }
 

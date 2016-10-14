@@ -8,6 +8,8 @@ use std::borrow::Cow;
 
 use sourcemap::{RawToken, SourceMap};
 
+use errors::{ErrorKind, Result};
+
 
 #[derive(Debug, Copy, Clone)]
 #[repr(C, packed)]
@@ -50,105 +52,111 @@ pub struct Token<'a> {
 
 impl<'a> MemDb<'a> {
 
-    pub fn from_cow(cow: Cow<'a, [u8]>) -> MemDb<'a> {
-        MemDb {
+    pub fn from_cow(cow: Cow<'a, [u8]>) -> Result<MemDb<'a>> {
+        let rv = MemDb {
             buffer: cow,
+        };
+        if try!(rv.header()).version != 1 {
+            Err(ErrorKind::UnsupportedMemDbVersion.into())
+        } else {
+            Ok(rv)
         }
     }
 
-    pub fn from_slice(buffer: &'a [u8]) -> MemDb<'a> {
+    pub fn from_slice(buffer: &'a [u8]) -> Result<MemDb<'a>> {
         MemDb::from_cow(Cow::Borrowed(buffer))
     }
 
-    pub fn from_vec(buffer: Vec<u8>) -> MemDb<'a> {
+    pub fn from_vec(buffer: Vec<u8>) -> Result<MemDb<'a>> {
         MemDb::from_cow(Cow::Owned(buffer))
     }
 
-    #[inline(always)]
     pub fn buffer(&self) -> &[u8] {
         &self.buffer
     }
 
     #[inline(always)]
-    fn header(&self) -> &MapHead {
-        let len = mem::size_of::<MapHead>();
-        unsafe {
-            mem::transmute(self.buffer()[0..len].as_ptr())
+    fn slice_buffer<T>(&self, start: usize, len: usize) -> Result<&T> {
+        let end = start.wrapping_add(len);
+        if end < start || end > self.buffer.len() {
+            Err(ErrorKind::BadMemDb.into())
+        } else {
+            Ok(unsafe {
+                mem::transmute(self.buffer[start..end].as_ptr())
+            })
         }
     }
 
     #[inline(always)]
-    fn index(&self) -> &[IndexItem] {
-        let head = self.header();
+    fn get_slice<T>(&self, offset: usize, count: usize) -> Result<&[T]> {
+        let size = mem::size_of::<T>();
+        Ok(unsafe {
+            slice::from_raw_parts(
+                try!(self.slice_buffer(offset, count * size)),
+                count
+            )
+        })
+    }
+
+    #[inline(always)]
+    fn header(&self) -> Result<&MapHead> {
+        Ok(try!(self.slice_buffer(0, mem::size_of::<MapHead>())))
+    }
+
+    #[inline(always)]
+    fn index(&self) -> Result<&[IndexItem]> {
+        let head = try!(self.header());
         let off = mem::size_of::<MapHead>();
-        let len = mem::size_of::<IndexItem>() * head.index_size as usize;
-        unsafe {
-            slice::from_raw_parts(
-                mem::transmute(self.buffer()[off..len].as_ptr()),
-                head.index_size as usize
-            )
-        }
+        self.get_slice(off, head.index_size as usize)
     }
 
     #[inline(always)]
-    fn names(&self) -> &[StringMarker] {
-        let head = self.header();
+    fn names(&self) -> Result<&[StringMarker]> {
+        let head = try!(self.header());
         let off = head.names_start as usize;
-        let len = mem::size_of::<StringMarker>() * head.names_count as usize;
-        unsafe {
-            slice::from_raw_parts(
-                mem::transmute(self.buffer()[off..off + len].as_ptr()),
-                head.names_count as usize
-            )
-        }
+        self.get_slice(off, head.names_count as usize)
     }
 
     #[inline(always)]
-    fn sources(&self) -> &[StringMarker] {
-        let head = self.header();
-        let len = mem::size_of::<StringMarker>() * head.sources_count as usize;
+    fn sources(&self) -> Result<&[StringMarker]> {
+        let head = try!(self.header());
         let off = head.sources_start as usize;
-        unsafe {
-            slice::from_raw_parts(
-                mem::transmute(self.buffer()[off..off + len].as_ptr()),
-                head.sources_count as usize
-            )
-        }
+        self.get_slice(off, head.sources_count as usize)
     }
 
     #[inline(always)]
-    fn source_contents(&self) -> &[StringMarker] {
-        let head = self.header();
+    fn source_contents(&self) -> Result<&[StringMarker]> {
+        let head = try!(self.header());
         let off = head.source_contents_start as usize;
-        let len = mem::size_of::<StringMarker>() * head.source_contents_count as usize;
-        unsafe {
-            slice::from_raw_parts(
-                mem::transmute(self.buffer()[off..off + len].as_ptr()),
-                head.source_contents_count as usize
-            )
-        }
+        self.get_slice(off, head.source_contents_count as usize)
     }
 
     pub fn get_name(&self, name_id: u32) -> Option<&str> {
-        self.names().get(name_id as usize).and_then(|m| {
+        self.names().ok().and_then(|x| x.get(name_id as usize)).and_then(|m| {
+            // XXX: range check
             from_utf8(&self.buffer()[m.pos as usize..(m.pos + m.len) as usize]).ok()
         })
     }
 
     pub fn get_source(&self, src_id: u32) -> Option<&str> {
-        self.sources().get(src_id as usize).and_then(|m| {
+        self.sources().ok().and_then(|x| x.get(src_id as usize)).and_then(|m| {
+            // XXX: range check
             from_utf8(&self.buffer()[m.pos as usize..(m.pos + m.len) as usize]).ok()
         })
     }
 
     pub fn get_source_contents(&self, src_id: u32) -> Option<&str> {
-        self.source_contents().get(src_id as usize).and_then(|m| {
+        self.source_contents().ok().and_then(|x| x.get(src_id as usize)).and_then(|m| {
+            // XXX: range check
             from_utf8(&self.buffer()[m.pos as usize..(m.pos + m.len) as usize]).ok()
         })
     }
 
     pub fn lookup_token(&'a self, line: u32, col: u32) -> Option<Token<'a>> {
-        let index = self.index();
+        let index = match self.index() {
+            Ok(idx) => idx,
+            Err(_) => { return None; }
+        };
         let mut low = 0;
         let mut high = index.len();
 
