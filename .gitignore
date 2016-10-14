@@ -2,6 +2,7 @@ target
 Cargo.lock
 *.egg-info
 .eggs
+*.so
 dist
 build
 venv
