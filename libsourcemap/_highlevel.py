@@ -10,7 +10,8 @@ from ._compat import to_bytes, implements_to_string
 _lib = _ffi.dlopen(os.path.join(os.path.dirname(__file__), '_libsourcemap.so'))
 
 
-Token = namedtuple('Token', ['src_line', 'src_col', 'src_id', 'src', 'name'])
+Token = namedtuple('Token', ['dst_line', 'dst_col', 'src', 'src_line',
+                             'src_col', 'src_id', 'name'])
 
 
 @implements_to_string
@@ -87,10 +88,12 @@ class View(object):
         if _lib.lsm_view_lookup_token(self._ptr, line, col, tok_out):
             tok = tok_out[0]
             return Token(
+                line,
+                col,
+                decode_rust_str(tok.src, tok.src_len),
                 tok.line,
                 tok.col,
                 tok.src_id,
-                decode_rust_str(tok.src, tok.src_len),
                 decode_rust_str(tok.name, tok.name_len)
             )
 
