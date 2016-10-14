@@ -1,3 +1,6 @@
+test:
+	PYTHONPATH=. py.test --tb=short tests
+
 develop:
 	pip install --verbose --editable .
 
@@ -27,4 +30,4 @@ release: sdist all-wheels
 	pip install twine
 	twine upload dist/libsourcemap-`python setup.py --version`[-.]*
 
-.PHONY: build develop wheel sdist clean-docker mac-wheels manylinux-wheels all-wheels release
+.PHONY: test build develop wheel sdist clean-docker mac-wheels manylinux-wheels all-wheels release
