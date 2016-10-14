@@ -3,8 +3,8 @@
 
 typedef void lsm_view_t;
 
-lsm_view_t *lsm_view_from_json(char *bytes, unsigned int len);
-lsm_view_t *lsm_view_from_memdb(char *bytes, unsigned int len);
+lsm_view_t *lsm_view_from_json(char *bytes, unsigned int len, char **err_out);
+lsm_view_t *lsm_view_from_memdb(char *bytes, unsigned int len, char **err_out);
 void lsm_view_free(lsm_view_t *view);
 
 int lsm_view_lookup_token(const lsm_view_t *view, unsigned int line,

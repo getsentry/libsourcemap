@@ -3,24 +3,39 @@ use std::mem;
 use std::slice;
 use std::os::raw::{c_int, c_uint};
 
+use errors::Error;
 use unified::View;
 
 
-#[no_mangle]
-pub unsafe fn lsm_view_from_json(bytes: *const u8, len: c_uint) -> *mut View {
-    Box::into_raw(Box::new(View::json_from_slice(slice::from_raw_parts(
-        mem::transmute(bytes),
-        len as usize
-    )).unwrap()))
+unsafe fn notify_err<T>(err: Error, err_out: *mut *mut u8) -> *mut T {
+    if !err_out.is_null() {
+        let s = format!("{}\x00", err);
+        *err_out = Box::into_raw(s.into_boxed_str()) as *mut u8;
+    }
+    0 as *mut T
 }
 
 #[no_mangle]
-pub unsafe fn lsm_view_from_memdb(bytes: *const u8, len: c_uint) -> *mut View {
-    // XXX: this currently copies because that's safer.  Consider improving this?
-    Box::into_raw(Box::new(View::memdb_from_vec(slice::from_raw_parts(
+pub unsafe fn lsm_view_from_json(bytes: *const u8, len: c_uint, err_out: *mut *mut u8) -> *mut View {
+    match View::json_from_slice(slice::from_raw_parts(
         mem::transmute(bytes),
         len as usize
-    ).to_vec()).unwrap()))
+    )) {
+        Ok(v) => Box::into_raw(Box::new(v)),
+        Err(err) => notify_err(err, err_out)
+    }
+}
+
+#[no_mangle]
+pub unsafe fn lsm_view_from_memdb(bytes: *const u8, len: c_uint, err_out: *mut *mut u8) -> *mut View {
+    // XXX: this currently copies because that's safer.  Consider improving this?
+    match View::memdb_from_vec(slice::from_raw_parts(
+        mem::transmute(bytes),
+        len as usize
+    ).to_vec()) {
+        Ok(v) => Box::into_raw(Box::new(v)),
+        Err(err) => notify_err(err, err_out)
+    }
 }
 
 #[no_mangle]
