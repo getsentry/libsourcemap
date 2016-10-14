@@ -5,7 +5,7 @@ it for Python.  It's based on [rust-sourcemap](https://github.com/mitsuhiko/rust
 for the main sourcemap handling and implements a separate format that
 can be cached more efficiently.
 
-Tested with Rust 1.10 and later.
+Tested with Rust 1.12 and later.
 
 ## Development
 

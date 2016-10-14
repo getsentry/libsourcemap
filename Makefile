@@ -4,6 +4,9 @@ develop:
 build:
 	cargo build --release
 
+sdist:
+	python setup.py sdist --formats=zip
+
 wheel:
 	SYMSYND_MANYLINUX="$(MANYLINUX)" ./build-wheels.sh
 
@@ -20,4 +23,8 @@ manylinux-wheels:
 
 all-wheels: mac-wheels manylinux-wheels
 
-.PHONY: build develop wheel clean-docker mac-wheels manylinux-wheels all-wheels
+release: sdist all-wheels
+	pip install twine
+	twine upload dist/libsourcemap-`python setup.py --version`[-.]*
+
+.PHONY: build develop wheel sdist clean-docker mac-wheels manylinux-wheels all-wheels release
