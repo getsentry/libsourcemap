@@ -4,20 +4,13 @@ from libsourcemap import View
 def get_fixtures(base):
     with open('tests/fixtures/%s.js' % base, 'rb') as f:
         source = f.read()
-    with open('tests/fixtures/%s.min.js' % base, 'rb') as f:
-        minified = f.read()
     with open('tests/fixtures/%s.min.map' % base, 'rb') as f:
         min_map = f.read()
-    return source, minified, min_map
+    return source, min_map
 
 
-def test_jquery():
-    source, minified, min_map = get_fixtures('jquery')
-
-    source_lines = source.splitlines()
-
-    index = View.from_json(min_map)
-
+def verify_index(index, source):
+    source_lines = source.decode('utf-8').splitlines()
     for token in index:
         # Ignore tokens that are None.
         # There's no simple way to verify they're correct
@@ -38,26 +31,19 @@ def test_jquery():
         assert token.name == substring
 
 
-def test_coolstuff():
-    source, minified, min_map = get_fixtures('coolstuff')
-
-    source_lines = source.splitlines()
-
+def test_jquery():
+    source, min_map = get_fixtures('jquery')
     index = View.from_json(min_map)
+    verify_index(index, source)
 
-    for token in index:
-        if token.name is None:
-            continue
 
-        source_line = source_lines[token.src_line]
-        start = token.src_col
-        end = start + len(token.name)
-        substring = source_line[start:end]
-        assert token.name == substring
+def test_coolstuff():
+    source, min_map = get_fixtures('coolstuff')
+    index = View.from_json(min_map)
+    verify_index(index, source)
 
 
 def test_unicode_names():
-    _, _, min_map = get_fixtures('unicode')
-
-    # This shouldn't blow up
-    View.from_json(min_map)
+    source, min_map = get_fixtures('unicode')
+    index = View.from_json(min_map)
+    verify_index(index, source)
