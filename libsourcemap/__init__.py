@@ -105,9 +105,3 @@ class View(object):
             self._ptr = None
         except Exception:
             pass
-
-
-def test():
-    view = View.from_json(open('/Users/mitsuhiko/Development/sentry/badmaps/embercom-8fd9a4b24359ef9fb0845763983b791f.map').read())
-    print view.lookup_token(10, 200)
-    print len(view.dump_memdb())
