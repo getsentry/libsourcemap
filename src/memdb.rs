@@ -79,8 +79,8 @@ impl<'a> MemDb<'a> {
     #[inline(always)]
     fn index(&self) -> &[IndexItem] {
         let head = self.header();
-        let len = mem::size_of::<IndexItem>() * head.index_size as usize;
         let off = mem::size_of::<MapHead>();
+        let len = mem::size_of::<IndexItem>() * head.index_size as usize;
         unsafe {
             slice::from_raw_parts(
                 mem::transmute(self.buffer()[off..len].as_ptr()),
@@ -92,8 +92,8 @@ impl<'a> MemDb<'a> {
     #[inline(always)]
     fn names(&self) -> &[StringMarker] {
         let head = self.header();
-        let len = mem::size_of::<StringMarker>() * head.names_count as usize;
         let off = head.names_start as usize;
+        let len = mem::size_of::<StringMarker>() * head.names_count as usize;
         unsafe {
             slice::from_raw_parts(
                 mem::transmute(self.buffer()[off..off + len].as_ptr()),
@@ -118,8 +118,8 @@ impl<'a> MemDb<'a> {
     #[inline(always)]
     fn source_contents(&self) -> &[StringMarker] {
         let head = self.header();
-        let len = mem::size_of::<StringMarker>() * head.source_contents_count as usize;
         let off = head.source_contents_start as usize;
+        let len = mem::size_of::<StringMarker>() * head.source_contents_count as usize;
         unsafe {
             slice::from_raw_parts(
                 mem::transmute(self.buffer()[off..off + len].as_ptr()),
