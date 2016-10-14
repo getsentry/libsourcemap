@@ -35,7 +35,10 @@ EXT_EXT = sys.platform == 'darwin' and '.dylib' or '.so'
 def build_libsourcemap(base_path):
     lib_path = os.path.join(base_path, '_libsourcemap.so')
     here = os.path.abspath(os.path.dirname(__file__))
-    rv = subprocess.Popen(['make', 'build'], cwd=here).wait()
+    cmdline = ['cargo', 'build', '--release']
+    if not sys.stdout.isatty():
+        cmdline.append('--color=always')
+    rv = subprocess.Popen(cmdline, cwd=here).wait()
     if rv != 0:
         sys.exit(rv)
     src_path = os.path.join(here, 'target', 'release',
