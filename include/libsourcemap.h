@@ -4,8 +4,10 @@
 typedef void lsm_view_t;
 
 typedef struct lsm_token_s {
-    unsigned int line;
-    unsigned int col;
+    unsigned int dst_line;
+    unsigned int dst_col;
+    unsigned int src_line;
+    unsigned int src_col;
     const char *name;
     unsigned int name_len;
     const char *src;

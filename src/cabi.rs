@@ -11,8 +11,10 @@ use unified::{View, TokenMatch};
 #[derive(Debug)]
 #[repr(C)]
 pub struct Token {
-    pub line: c_uint,
-    pub col: c_uint,
+    pub dst_line: c_uint,
+    pub dst_col: c_uint,
+    pub src_line: c_uint,
+    pub src_col: c_uint,
     pub name: *const u8,
     pub name_len: c_uint,
     pub src: *const u8,
@@ -38,8 +40,10 @@ fn get_error_code_from_kind(kind: &ErrorKind) -> c_int {
 }
 
 unsafe fn set_token<'a>(out: *mut Token, tm: &'a TokenMatch<'a>) {
-    (*out).line = tm.line;
-    (*out).col = tm.col;
+    (*out).dst_line = tm.dst_line;
+    (*out).dst_col = tm.dst_col;
+    (*out).src_line = tm.src_line;
+    (*out).src_col = tm.src_col;
     (*out).name = match tm.name {
         Some(name) => name.as_ptr(),
         None => ptr::null()

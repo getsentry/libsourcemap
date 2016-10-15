@@ -17,8 +17,10 @@ pub struct View {
 
 #[derive(Debug)]
 pub struct TokenMatch<'a> {
-    pub line: u32,
-    pub col: u32,
+    pub dst_line: u32,
+    pub dst_col: u32,
+    pub src_line: u32,
+    pub src_col: u32,
     pub name: Option<&'a str>,
     pub src: &'a str,
     pub src_id: u32,
@@ -60,8 +62,10 @@ impl View {
             MapRepr::Json(ref sm) => {
                 if let Some(tok) = sm.lookup_token(line, col) {
                     return Some(TokenMatch {
-                        line: tok.get_src_line(),
-                        col: tok.get_src_col(),
+                        src_line: tok.get_src_line(),
+                        src_col: tok.get_src_col(),
+                        dst_line: tok.get_src_line(),
+                        dst_col: tok.get_src_col(),
                         name: tok.get_name(),
                         src: tok.get_source(),
                         src_id: tok.get_raw_token().src_id,
@@ -71,8 +75,10 @@ impl View {
             MapRepr::Mem(ref db) => {
                 if let Some(tok) = db.lookup_token(line, col) {
                     return Some(TokenMatch {
-                        line: tok.get_src_line(),
-                        col: tok.get_src_col(),
+                        src_line: tok.get_src_line(),
+                        src_col: tok.get_src_col(),
+                        dst_line: tok.get_src_line(),
+                        dst_col: tok.get_src_col(),
                         name: tok.get_name(),
                         src: tok.get_source(),
                         src_id: tok.get_raw_token().src_id,
@@ -102,8 +108,10 @@ impl View {
             MapRepr::Json(ref sm) => {
                 if let Some(tok) = sm.get_token(idx) {
                     return Some(TokenMatch {
-                        line: tok.get_src_line(),
-                        col: tok.get_src_col(),
+                        src_line: tok.get_src_line(),
+                        src_col: tok.get_src_col(),
+                        dst_line: tok.get_src_line(),
+                        dst_col: tok.get_src_col(),
                         name: tok.get_name(),
                         src: tok.get_source(),
                         src_id: tok.get_raw_token().src_id,
@@ -113,8 +121,10 @@ impl View {
             MapRepr::Mem(ref db) => {
                 if let Some(tok) = db.get_token(idx) {
                     return Some(TokenMatch {
-                        line: tok.get_src_line(),
-                        col: tok.get_src_col(),
+                        src_line: tok.get_src_line(),
+                        src_col: tok.get_src_col(),
+                        dst_line: tok.get_src_line(),
+                        dst_col: tok.get_src_col(),
                         name: tok.get_name(),
                         src: tok.get_source(),
                         src_id: tok.get_raw_token().src_id,

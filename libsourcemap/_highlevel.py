@@ -38,13 +38,13 @@ def decode_rust_str(ptr, len):
         return _ffi.unpack(ptr, len).decode('utf-8', 'replace')
 
 
-def convert_token(tok, line=0, col=0):
+def convert_token(tok):
     return Token(
-        line,
-        col,
+        tok.dst_line,
+        tok.dst_col,
         decode_rust_str(tok.src, tok.src_len),
-        tok.line,
-        tok.col,
+        tok.src_line,
+        tok.src_col,
         tok.src_id,
         decode_rust_str(tok.name, tok.name_len)
     )
@@ -104,7 +104,7 @@ class View(object):
             return None
         tok_out = _ffi.new('lsm_token_t *')
         if _lib.lsm_view_lookup_token(self._ptr, line, col, tok_out):
-            return convert_token(tok_out[0], line, col)
+            return convert_token(tok_out[0])
 
     def get_source_contents(self, src_id):
         """Given a source ID this returns the embedded sourcecode if there is.

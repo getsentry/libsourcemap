@@ -14,8 +14,10 @@ use errors::{ErrorKind, Result};
 #[derive(Debug, Copy, Clone)]
 #[repr(C, packed)]
 pub struct IndexItem {
-    pub line: u32,
-    pub col: u32,
+    pub src_line: u16,
+    pub src_col: u16,
+    pub dst_line: u32,
+    pub dst_col: u32,
     pub name_id: u32,
     pub src_id: u32,
 }
@@ -93,10 +95,10 @@ impl<'a> MemDb<'a> {
                 Token {
                     db: self,
                     raw: RawToken {
-                        dst_line: 0,
-                        dst_col: 0,
-                        src_line: ii.line,
-                        src_col: ii.col,
+                        dst_line: ii.dst_line,
+                        dst_col: ii.dst_col,
+                        src_line: ii.src_line as u32,
+                        src_col: ii.src_col as u32,
                         src_id: ii.src_id,
                         name_id: ii.name_id,
                     }
@@ -116,7 +118,7 @@ impl<'a> MemDb<'a> {
         while low < high {
             let mid = (low + high) / 2;
             let ii = &index[mid as usize];
-            if (line, col) < (ii.line, ii.col) {
+            if (line, col) < (ii.dst_line, ii.dst_col) {
                 high = mid;
             } else {
                 low = mid + 1;
@@ -318,9 +320,13 @@ pub fn sourcemap_to_memdb<W: Write+Seek>(sm: &SourceMap, mut w: W) -> io::Result
     for (line, col, token_id) in sm.index_iter() {
         let token = sm.get_token(token_id).unwrap();
         let raw = token.get_raw_token();
+        assert!(line == raw.dst_line);
+        assert!(col == raw.dst_col);
         let item = IndexItem {
-            line: line,
-            col: col,
+            dst_line: line,
+            dst_col: col,
+            src_line: raw.src_line as u16,
+            src_col: raw.src_col as u16,
             name_id: raw.name_id,
             src_id: raw.src_id,
         };
@@ -331,11 +337,11 @@ pub fn sourcemap_to_memdb<W: Write+Seek>(sm: &SourceMap, mut w: W) -> io::Result
     let mut names = vec![];
     for name in sm.names() {
         let to_write = name.as_bytes();
-        try!(w.write_all(to_write));
         names.push(StringMarker {
             pos: idx,
             len: to_write.len() as u32,
         });
+        try!(w.write_all(to_write));
         idx += to_write.len() as u32;
     }
 
@@ -346,21 +352,21 @@ pub fn sourcemap_to_memdb<W: Write+Seek>(sm: &SourceMap, mut w: W) -> io::Result
     for source_id in 0..sm.get_source_count() {
         let source = sm.get_source(source_id).unwrap();
         let to_write = source.as_bytes();
-        try!(w.write_all(to_write));
         sources.push(StringMarker {
             pos: idx,
             len: to_write.len() as u32,
         });
+        try!(w.write_all(to_write));
         idx += to_write.len() as u32;
 
         if let Some(contents) = sm.get_source_contents(source_id) {
             let to_write = contents.as_bytes();
-            try!(w.write_all(to_write));
             have_sources = true;
             source_contents.push(StringMarker {
                 pos: idx,
                 len: to_write.len() as u32,
             });
+            try!(w.write_all(to_write));
             idx += to_write.len() as u32;
         } else {
             source_contents.push(StringMarker {

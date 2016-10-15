@@ -1,4 +1,4 @@
-test:
+test: develop
 	PYTHONPATH=. py.test --tb=short tests
 
 develop:
