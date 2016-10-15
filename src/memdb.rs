@@ -14,12 +14,11 @@ use errors::{ErrorKind, Result};
 #[derive(Debug, Copy, Clone)]
 #[repr(C, packed)]
 pub struct IndexItem {
-    pub src_line: u16,
-    pub src_col: u16,
     pub dst_line: u32,
     pub dst_col: u32,
-    pub name_id: u32,
-    pub src_id: u32,
+    pub src_line: u16,
+    pub src_col: u16,
+    pub ids: u32,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -99,8 +98,8 @@ impl<'a> MemDb<'a> {
                         dst_col: ii.dst_col,
                         src_line: ii.src_line as u32,
                         src_col: ii.src_col as u32,
-                        src_id: ii.src_id,
-                        name_id: ii.name_id,
+                        src_id: ii.ids >> 22,
+                        name_id: ii.ids & 0x3fffff,
                     }
                 }
             })
@@ -327,8 +326,8 @@ pub fn sourcemap_to_memdb<W: Write+Seek>(sm: &SourceMap, mut w: W) -> io::Result
             dst_col: col,
             src_line: raw.src_line as u16,
             src_col: raw.src_col as u16,
-            name_id: raw.name_id,
-            src_id: raw.src_id,
+            // XXX: these can individually overflow
+            ids: (raw.src_id << 22 | raw.name_id),
         };
         idx += try!(write_obj(&mut w, &item));
     }
