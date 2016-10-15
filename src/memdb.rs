@@ -240,7 +240,7 @@ impl<'a> Token<'a> {
 
     /// get the name if it exists as string
     pub fn get_name(&self) -> Option<&'a str> {
-        self.db.get_name(self.raw.src_id)
+        self.db.get_name(self.raw.name_id)
     }
 
     /// returns `true` if a name exists, `false` otherwise
