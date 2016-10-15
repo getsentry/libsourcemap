@@ -14,5 +14,7 @@ addons:
 install:
   - curl https://sh.rustup.rs -sSf | sh -s -- -y
   - export PATH="${HOME}/.cargo/.bin:${PATH}"
+  - which cargo
+  - which rustc
   - pip install wheel
   - make develop
