@@ -18,3 +18,5 @@ install:
   - which rustc
   - pip install wheel
   - make develop
+
+script: make test
