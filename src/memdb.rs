@@ -23,13 +23,6 @@ pub struct IndexItem {
 
 #[derive(Debug, Copy, Clone)]
 #[repr(C, packed)]
-pub struct StringMarker {
-    pub pos: u32,
-    pub len: u32,
-}
-
-#[derive(Debug, Copy, Clone)]
-#[repr(C, packed)]
 pub struct MapHead {
     pub version: u32,
     pub index_size: u32,
@@ -154,14 +147,21 @@ impl<'a> MemDb<'a> {
         })
     }
 
-    fn get_string(&self, coll: &[StringMarker], idx: u32) -> Option<&str> {
-        if let Some(m) = coll.get(idx as usize) {
-            match self.get_data(m.pos as usize, m.len as usize) {
-                Ok(bytes) => { return from_utf8(bytes).ok(); }
-                Err(_) => { return None; }
-            };
-        }
-        None
+    fn get_string(&self, coll: &[u32], idx: u32) -> Option<&str> {
+        coll.get(idx as usize).and_then(|offset| {
+            let offset = *offset as usize;
+            let buffer = self.buffer();
+            let mut len = 0;
+            loop {
+                if offset + len >= buffer.len() {
+                    return None;
+                } else if buffer[offset + len] == b'\x00' {
+                    break;
+                }
+                len += 1;
+            }
+            from_utf8(&buffer[offset..offset + len]).ok()
+        })
     }
 
     #[inline(always)]
@@ -179,21 +179,21 @@ impl<'a> MemDb<'a> {
     }
 
     #[inline(always)]
-    fn names(&self) -> Result<&[StringMarker]> {
+    fn names(&self) -> Result<&[u32]> {
         let head = try!(self.header());
         let off = head.names_start as usize;
         self.get_slice(off, head.names_count as usize)
     }
 
     #[inline(always)]
-    fn sources(&self) -> Result<&[StringMarker]> {
+    fn sources(&self) -> Result<&[u32]> {
         let head = try!(self.header());
         let off = head.sources_start as usize;
         self.get_slice(off, head.sources_count as usize)
     }
 
     #[inline(always)]
-    fn source_contents(&self) -> Result<&[StringMarker]> {
+    fn source_contents(&self) -> Result<&[u32]> {
         let head = try!(self.header());
         let off = head.source_contents_start as usize;
         self.get_slice(off, head.source_contents_count as usize)
@@ -290,6 +290,14 @@ fn write_obj<T, W: Write>(w: &mut W, x: &T) -> io::Result<u32> {
     }
 }
 
+fn write_cstr<W: Write>(w: &mut W, bytes: &[u8]) -> io::Result<u32> {
+    // XXX: strip out contained null bytes? does not seem to cause a security
+    // problem here so maybe we can live with not doing that for now.
+    try!(w.write_all(bytes));
+    try!(w.write_all(b"\x00"));
+    Ok(bytes.len() as u32 + 1)
+}
+
 fn write_slice<T, W: Write>(w: &mut W, x: &[T]) -> io::Result<u32> {
     unsafe {
         let bytes : *const u8 = mem::transmute(x.as_ptr());
@@ -335,13 +343,8 @@ pub fn sourcemap_to_memdb<W: Write+Seek>(sm: &SourceMap, mut w: W) -> io::Result
     // write names
     let mut names = vec![];
     for name in sm.names() {
-        let to_write = name.as_bytes();
-        names.push(StringMarker {
-            pos: idx,
-            len: to_write.len() as u32,
-        });
-        try!(w.write_all(to_write));
-        idx += to_write.len() as u32;
+        names.push(idx);
+        idx += try!(write_cstr(&mut w, name.as_bytes()));
     }
 
     // write sources
@@ -350,28 +353,15 @@ pub fn sourcemap_to_memdb<W: Write+Seek>(sm: &SourceMap, mut w: W) -> io::Result
     let mut have_sources = false;
     for source_id in 0..sm.get_source_count() {
         let source = sm.get_source(source_id).unwrap();
-        let to_write = source.as_bytes();
-        sources.push(StringMarker {
-            pos: idx,
-            len: to_write.len() as u32,
-        });
-        try!(w.write_all(to_write));
-        idx += to_write.len() as u32;
+        sources.push(idx);
+        idx += try!(write_cstr(&mut w, source.as_bytes()));
 
         if let Some(contents) = sm.get_source_contents(source_id) {
-            let to_write = contents.as_bytes();
             have_sources = true;
-            source_contents.push(StringMarker {
-                pos: idx,
-                len: to_write.len() as u32,
-            });
-            try!(w.write_all(to_write));
-            idx += to_write.len() as u32;
+            source_contents.push(idx);
+            idx += try!(write_cstr(&mut w, contents.as_bytes()));
         } else {
-            source_contents.push(StringMarker {
-                pos: 0,
-                len: 0
-            });
+            source_contents.push(!0);
         }
     }
 
