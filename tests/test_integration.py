@@ -1,3 +1,8 @@
+try:
+    from itertools import izip
+except ImportError:
+    izip = zip
+
 from libsourcemap import View
 
 
@@ -31,6 +36,11 @@ def verify_index(index, source):
         assert token.name == substring
 
 
+def verify_token_equivalence(index, mem_index):
+    for tok1, tok2 in izip(index, mem_index):
+        assert tok1 == tok2
+
+
 def test_jquery():
     source, min_map = get_fixtures('jquery')
     index = View.from_json(min_map)
@@ -42,6 +52,7 @@ def test_jquery_memdb():
     index = View.from_json(min_map)
     mem_index = View.from_memdb(index.dump_memdb())
     verify_index(mem_index, source)
+    verify_token_equivalence(index, mem_index)
 
 
 def test_coolstuff():
@@ -55,6 +66,7 @@ def test_coolstuff_memdb():
     index = View.from_json(min_map)
     mem_index = View.from_memdb(index.dump_memdb())
     verify_index(mem_index, source)
+    verify_token_equivalence(index, mem_index)
 
 
 def test_unicode_names():
@@ -68,6 +80,7 @@ def test_unicode_names_memdb():
     index = View.from_json(min_map)
     mem_index = View.from_memdb(index.dump_memdb())
     verify_index(mem_index, source)
+    verify_token_equivalence(index, mem_index)
 
 
 def test_react_dom():
@@ -81,3 +94,4 @@ def test_react_dom_memdb():
     index = View.from_json(min_map)
     mem_index = View.from_memdb(index.dump_memdb())
     verify_index(mem_index, source)
+    verify_token_equivalence(index, mem_index)
