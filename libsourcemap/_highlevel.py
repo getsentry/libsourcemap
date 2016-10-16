@@ -120,6 +120,7 @@ class View(object):
         tok_out = _ffi.new('lsm_token_t *')
         if _lib.lsm_view_get_token(self._ptr, idx, tok_out):
             return convert_token(tok_out[0])
+        raise IndexError(idx)
 
     def __len__(self):
         return _lib.lsm_view_get_token_count(self._ptr)
