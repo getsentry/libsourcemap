@@ -8,5 +8,5 @@ name = "libsourcemap"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-sourcemap = "0.6.2"
+sourcemap = "0.6.3"
 error-chain = "0.5.0"
