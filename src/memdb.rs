@@ -335,7 +335,7 @@ pub fn sourcemap_to_memdb<W: Write+Seek>(sm: &SourceMap, mut w: W) -> io::Result
             src_line: raw.src_line as u16,
             src_col: raw.src_col as u16,
             // XXX: these can individually overflow
-            ids: (raw.src_id << 22 | raw.name_id),
+            ids: ((raw.src_id & 0x3ff) << 22) | (raw.name_id & 0x3fffff),
         };
         idx += try!(write_obj(&mut w, &item));
     }
