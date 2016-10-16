@@ -44,6 +44,33 @@ pub struct Token<'a> {
 }
 
 
+fn pack_ids(src_id: u32, name_id: u32) -> Result<u32> {
+    let packed_src_id : u32 = src_id & 0x3fff;
+    let packed_name_id : u32 = name_id & 0x3ffff;
+
+    if src_id != !0 && packed_src_id >= 0x3fff {
+        return Err(ErrorKind::TooManySources.into());
+    }
+    if name_id != !0 && packed_name_id >= 0x3ffff {
+        return Err(ErrorKind::TooManyNames.into());
+    }
+
+    Ok((packed_src_id << 18) | packed_name_id)
+}
+
+fn unpack_ids(packed_ids: u32) -> (u32, u32) {
+    let mut src_id : u32 = packed_ids >> 18;
+    let mut name_id : u32 = packed_ids & 0x3ffff;
+    if src_id == 0x3fff {
+        src_id = !0;
+    }
+    if name_id == 0x3ffff {
+        name_id = !0;
+    }
+    (src_id, name_id)
+}
+
+
 impl<'a> MemDb<'a> {
 
     pub fn from_cow(cow: Cow<'a, [u8]>) -> Result<MemDb<'a>> {
@@ -84,6 +111,7 @@ impl<'a> MemDb<'a> {
     pub fn get_token(&'a self, idx: u32) -> Option<Token<'a>> {
         self.index().ok().and_then(|index| {
             (&index.get(idx as usize)).map(|ii| {
+                let (src_id, name_id) = unpack_ids(ii.ids);
                 Token {
                     db: self,
                     raw: RawToken {
@@ -91,8 +119,8 @@ impl<'a> MemDb<'a> {
                         dst_col: ii.dst_col,
                         src_line: ii.src_line as u32,
                         src_col: ii.src_col as u32,
-                        src_id: ii.ids >> 22,
-                        name_id: ii.ids & 0x3fffff,
+                        src_id: src_id,
+                        name_id: name_id,
                     }
                 }
             })
@@ -117,8 +145,8 @@ impl<'a> MemDb<'a> {
             }
         }
 
-        if low <= high && low < index.len() {
-            self.get_token(low as u32)
+        if low > 0 && low <= high && low <= index.len() {
+            self.get_token(low as u32 - 1)
         } else {
             None
         }
@@ -308,7 +336,7 @@ fn write_slice<T, W: Write>(w: &mut W, x: &[T]) -> io::Result<u32> {
 }
 
 /// Serializes a map into a given writer
-pub fn sourcemap_to_memdb<W: Write+Seek>(sm: &SourceMap, mut w: W) -> io::Result<()> {
+pub fn sourcemap_to_memdb<W: Write+Seek>(sm: &SourceMap, mut w: W) -> Result<()> {
     let mut head = MapHead {
         version: 1,
         index_size: sm.get_index_size() as u32,
@@ -334,8 +362,7 @@ pub fn sourcemap_to_memdb<W: Write+Seek>(sm: &SourceMap, mut w: W) -> io::Result
             dst_col: col,
             src_line: raw.src_line as u16,
             src_col: raw.src_col as u16,
-            // XXX: these can individually overflow
-            ids: ((raw.src_id & 0x3ff) << 22) | (raw.name_id & 0x3fffff),
+            ids: try!(pack_ids(raw.src_id, raw.name_id))
         };
         idx += try!(write_obj(&mut w, &item));
     }

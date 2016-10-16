@@ -16,5 +16,11 @@ error_chain! {
         BadMemDb {
             description("Bad memdb data")
         }
+        TooManySources {
+            description("Too many sources in the file for memdb")
+        }
+        TooManyNames {
+            description("Too many names in the file for memdb")
+        }
     }
 }
