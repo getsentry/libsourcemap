@@ -117,7 +117,7 @@ impl<'a> MemDb<'a> {
             }
         }
 
-        if low > 0 {
+        if low < high {
             self.get_token(low as u32)
         } else {
             None
