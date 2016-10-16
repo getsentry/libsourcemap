@@ -1,4 +1,4 @@
-from ._highlevel import View, Token
+from .highlevel import View, Token
 from .exceptions import SourceMapError, IndexedSourceMap, BadJson, \
     UnsupportedMemDbVersion
 
