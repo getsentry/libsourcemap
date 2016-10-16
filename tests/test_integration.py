@@ -97,8 +97,14 @@ def verify_react_token_search(index):
     for idx, token in enumerate(index):
         if not token.name:
             continue
-        token_match = index.lookup_token(token.dst_line, token.dst_col)
-        assert token_match == token
+        try:
+            next_token = index[idx + 1]
+            rng = range(token.dst_col, next_token.dst_col)
+        except LookupError:
+            rng = (token.dst_col,)
+        for col in rng:
+            token_match = index.lookup_token(token.dst_line, col)
+            assert token_match == token
 
 
 def test_react_dom():
