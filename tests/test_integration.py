@@ -68,3 +68,16 @@ def test_unicode_names_memdb():
     index = View.from_json(min_map)
     mem_index = View.from_memdb(index.dump_memdb())
     verify_index(mem_index, source)
+
+
+def test_react_dom():
+    source, min_map = get_fixtures('react-dom')
+    index = View.from_json(min_map)
+    verify_index(index, source)
+
+
+def test_react_dom_memdb():
+    source, min_map = get_fixtures('react-dom')
+    index = View.from_json(min_map)
+    mem_index = View.from_memdb(index.dump_memdb())
+    verify_index(mem_index, source)
