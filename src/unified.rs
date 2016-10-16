@@ -64,8 +64,8 @@ impl View {
                     return Some(TokenMatch {
                         src_line: tok.get_src_line(),
                         src_col: tok.get_src_col(),
-                        dst_line: tok.get_src_line(),
-                        dst_col: tok.get_src_col(),
+                        dst_line: tok.get_dst_line(),
+                        dst_col: tok.get_dst_col(),
                         name: tok.get_name(),
                         src: tok.get_source(),
                         src_id: tok.get_raw_token().src_id,
