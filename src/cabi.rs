@@ -5,7 +5,7 @@ use std::os::raw::{c_int, c_uint};
 
 use sourcemap::Error as SourceMapError;
 use errors::{Error, ErrorKind};
-use unified::{View, TokenMatch};
+use unified::{View, TokenMatch, Index};
 
 
 #[derive(Debug)]
@@ -34,7 +34,8 @@ fn get_error_code_from_kind(kind: &ErrorKind) -> c_int {
     match *kind {
         ErrorKind::SourceMapError(SourceMapError::IndexedSourcemap) => 2,
         ErrorKind::SourceMapError(SourceMapError::BadJson(_, _, _)) => 3,
-        ErrorKind::UnsupportedMemDbVersion => 4,
+        ErrorKind::SourceMapError(SourceMapError::CannotFlatten(_)) => 4,
+        ErrorKind::UnsupportedMemDbVersion => 5,
         _ => 1,
     }
 }
@@ -144,5 +145,32 @@ pub unsafe fn lsm_view_dump_memdb(view: *mut View, len_out: *mut c_uint) -> *mut
 pub unsafe fn lsm_buffer_free(buf: *mut u8) {
     if !buf.is_null() {
         Box::from_raw(buf);
+    }
+}
+
+#[no_mangle]
+pub unsafe fn lsm_index_from_json(bytes: *const u8, len: c_uint, err_out: *mut CError) -> *mut Index {
+    match Index::json_from_slice(slice::from_raw_parts(
+        mem::transmute(bytes),
+        len as usize
+    )) {
+        Ok(v) => Box::into_raw(Box::new(v)),
+        Err(err) => notify_err(err, err_out)
+    }
+}
+
+#[no_mangle]
+pub unsafe fn lsm_index_free(idx: *mut Index) {
+    if !idx.is_null() {
+        Box::from_raw(idx);
+    }
+}
+
+#[no_mangle]
+pub unsafe fn lsm_index_into_view(idx: *mut Index, err_out: *mut CError) -> *mut View {
+    let idx = Box::from_raw(idx);
+    match idx.into_view() {
+        Ok(view) => Box::into_raw(Box::new(view)),
+        Err(err) => notify_err(err, err_out)
     }
 }

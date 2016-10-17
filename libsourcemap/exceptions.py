@@ -20,6 +20,10 @@ class BadJson(SourceMapError):
     """Raised if bad JSON data was encountered."""
 
 
+class CannotFlatten(SourceMapError):
+    """Raised if an index cannot be flattened into a sourcemap."""
+
+
 class UnsupportedMemDbVersion(SourceMapError):
     """Raised if an unsupported memdb is loaded."""
 
@@ -27,5 +31,6 @@ class UnsupportedMemDbVersion(SourceMapError):
 special_errors = {
     2: IndexedSourceMap,
     3: BadJson,
-    4: UnsupportedMemDbVersion,
+    4: CannotFlatten,
+    5: UnsupportedMemDbVersion,
 }

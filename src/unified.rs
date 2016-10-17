@@ -1,6 +1,6 @@
 use std::io::{Read, Cursor};
 
-use sourcemap::SourceMap;
+use sourcemap::{SourceMap, SourceMapIndex};
 
 use memdb::{MemDb, sourcemap_to_memdb};
 use errors::Result;
@@ -13,6 +13,10 @@ enum MapRepr {
 
 pub struct View {
     map: MapRepr,
+}
+
+pub struct Index {
+    index: SourceMapIndex,
 }
 
 #[derive(Debug)]
@@ -42,6 +46,12 @@ impl View {
     pub fn memdb_from_vec(vec: Vec<u8>) -> Result<View> {
         Ok(View {
             map: MapRepr::Mem(try!(MemDb::from_vec(vec)))
+        })
+    }
+
+    pub fn from_sourcemap(sm: SourceMap) -> Result<View> {
+        Ok(View {
+            map: MapRepr::Json(sm)
         })
     }
 
@@ -133,5 +143,17 @@ impl View {
             }
         }
         None
+    }
+}
+
+impl Index {
+    pub fn json_from_slice(buffer: &[u8]) -> Result<Index> {
+        Ok(Index {
+            index: try!(SourceMapIndex::from_slice(&buffer)),
+        })
+    }
+
+    pub fn into_view(self) -> Result<View> {
+        View::from_sourcemap(try!(self.index.flatten()))
     }
 }

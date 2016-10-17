@@ -1,12 +1,12 @@
-from .highlevel import View, Token
+from .highlevel import parse_json, View, Token, Index
 from .exceptions import SourceMapError, IndexedSourceMap, BadJson, \
-    UnsupportedMemDbVersion
+    CannotFlatten, UnsupportedMemDbVersion
 
 __all__ = [
     # General stuff
-    'View', 'Token',
+    'View', 'Index', 'Token', 'parse_json',
 
     # Exceptions
-    'SourceMapError', 'IndexedSourceMap', 'BadJson',
+    'SourceMapError', 'IndexedSourceMap', 'BadJson', 'CannotFlatten',
     'UnsupportedMemDbVersion'
 ]

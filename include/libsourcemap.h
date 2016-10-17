@@ -2,6 +2,7 @@
 #define LIBSOURCEMAP_H_INCLUDED
 
 typedef void lsm_view_t;
+typedef void lsm_index_t;
 
 typedef struct lsm_token_s {
     unsigned int dst_line;
@@ -34,6 +35,10 @@ const char *lsm_view_get_source_contents(const lsm_view_t *view,
                                          unsigned int *len_out);
 char *lsm_view_dump_memdb(const lsm_view_t *view,
                           unsigned int *len_out);
+
+lsm_index_t *lsm_index_from_json(char *bytes, unsigned int len, lsm_error_t *err);
+void lsm_index_free(lsm_index_t *index);
+lsm_view_t *lsm_index_into_view(lsm_index_t *index, lsm_error_t *err);
 
 void lsm_buffer_free(char *buf);
 

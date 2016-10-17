@@ -5,7 +5,7 @@ from collections import namedtuple
 
 from ._sourcemapnative import ffi as _ffi
 from ._compat import to_bytes
-from .exceptions import SourceMapError, special_errors
+from .exceptions import SourceMapError, IndexedSourceMap, special_errors
 
 
 _lib = _ffi.dlopen(os.path.join(os.path.dirname(__file__), '_libsourcemap.so'))
@@ -50,6 +50,15 @@ def convert_token(tok):
     )
 
 
+def parse_json(buffer):
+    """Parses a JSON string into either a view or an index."""
+    buffer = to_bytes(buffer)
+    try:
+        return View.from_json(buffer)
+    except IndexedSourceMap:
+        return Index.from_json(buffer)
+
+
 class View(object):
     """Provides a view of a sourcemap.  This can come from two sources:
 
@@ -85,10 +94,15 @@ class View(object):
         rv._ptr = ptr
         return rv
 
+    def _get_ptr(self):
+        if not self._ptr:
+            raise RuntimeError('View is closed')
+        return self._ptr
+
     def dump_memdb(self):
         """Dumps a sourcemap in MemDB format into bytes."""
         len_out = _ffi.new('unsigned int *')
-        buf = _lib.lsm_view_dump_memdb(self._ptr, len_out)
+        buf = _lib.lsm_view_dump_memdb(self._get_ptr(), len_out)
         try:
             rv = _ffi.unpack(buf, len_out[0])
         finally:
@@ -103,7 +117,7 @@ class View(object):
         if line < 0 or col < 0:
             return None
         tok_out = _ffi.new('lsm_token_t *')
-        if _lib.lsm_view_lookup_token(self._ptr, line, col, tok_out):
+        if _lib.lsm_view_lookup_token(self._get_ptr(), line, col, tok_out):
             return convert_token(tok_out[0])
 
     def get_source_contents(self, src_id):
@@ -111,19 +125,19 @@ class View(object):
         The sourcecode is returned as UTF-8 bytes for more efficient processing.
         """
         len_out = _ffi.new('unsigned int *')
-        rv = _lib.lsm_view_get_source_contents(self._ptr, src_id, len_out)
+        rv = _lib.lsm_view_get_source_contents(self._get_ptr(), src_id, len_out)
         if rv:
             return _ffi.unpack(rv, len_out[0])
 
     def __getitem__(self, idx):
         """Returns a token with a given index."""
         tok_out = _ffi.new('lsm_token_t *')
-        if _lib.lsm_view_get_token(self._ptr, idx, tok_out):
+        if _lib.lsm_view_get_token(self._get_ptr(), idx, tok_out):
             return convert_token(tok_out[0])
         raise IndexError(idx)
 
     def __len__(self):
-        return _lib.lsm_view_get_token_count(self._ptr)
+        return _lib.lsm_view_get_token_count(self._get_ptr())
 
     def __iter__(self):
         for idx in xrange(len(self)):
@@ -133,6 +147,49 @@ class View(object):
         try:
             if self._ptr:
                 _lib.lsm_view_free(self._ptr)
+            self._ptr = None
+        except Exception:
+            pass
+
+
+class Index(object):
+
+    def __init__(self):
+        raise TypeError('Cannot instanciate indexes')
+
+    @staticmethod
+    def from_json(buffer):
+        """Creates an index from a JSON string."""
+        buffer = to_bytes(buffer)
+        with capture_err() as (err_out, check):
+            return Index._from_ptr(check(_lib.lsm_index_from_json(
+                buffer, len(buffer), err_out)))
+
+    @staticmethod
+    def _from_ptr(ptr):
+        rv = object.__new__(Index)
+        rv._ptr = ptr
+        return rv
+
+    def _get_ptr(self):
+        if not self._ptr:
+            raise RuntimeError('Index is closed')
+        return self._ptr
+
+    def into_view(self):
+        """Converts the index into a view"""
+        with capture_err() as (err_out, check):
+            rv = View._from_ptr(check(_lib.lsm_index_into_view(
+                self._get_ptr(), err_out)))
+            # If we don't fail, we already freed and as such should zero
+            # out our pointer
+            self._ptr = None
+            return rv
+
+    def __del__(self):
+        try:
+            if self._ptr:
+                _lib.lsm_index_free(self._ptr)
             self._ptr = None
         except Exception:
             pass
