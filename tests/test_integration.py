@@ -1,44 +1,6 @@
-try:
-    from itertools import izip
-except ImportError:
-    izip = zip
-
 from libsourcemap import View
 
-
-def get_fixtures(base):
-    with open('tests/fixtures/%s.js' % base, 'rb') as f:
-        source = f.read()
-    with open('tests/fixtures/%s.min.map' % base, 'rb') as f:
-        min_map = f.read()
-    return source, min_map
-
-
-def verify_index(index, source):
-    source_lines = source.decode('utf-8').splitlines()
-    for token in index:
-        # Ignore tokens that are None.
-        # There's no simple way to verify they're correct
-        if token.name is None:
-            continue
-        source_line = source_lines[token.src_line]
-        start = token.src_col
-        end = start + len(token.name)
-        substring = source_line[start:end]
-
-        # jQuery's sourcemap has a few tokens that are identified
-        # incorrectly.
-        # For example, they have a token for 'embed', and
-        # it maps to '"embe', which is wrong. This only happened
-        # for a few strings, so we ignore
-        if substring[0] == '"':
-            continue
-        assert token.name == substring
-
-
-def verify_token_equivalence(index, mem_index):
-    for tok1, tok2 in izip(index, mem_index):
-        assert tok1 == tok2
+from testutils import get_fixtures, verify_index, verify_token_equivalence
 
 
 def test_jquery():
