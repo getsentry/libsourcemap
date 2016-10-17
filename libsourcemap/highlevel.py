@@ -50,7 +50,7 @@ def convert_token(tok):
     )
 
 
-def parse_json(buffer, auto_flatten=True):
+def from_json(buffer, auto_flatten=True):
     """Parses a JSON string into either a view or an index.  If auto flatten
     is enabled a sourcemap index that does not contain external references is
     automatically flattened into a view.

@@ -1,4 +1,4 @@
-from libsourcemap import View
+from libsourcemap import View, Index, from_json
 
 from testutils import get_fixtures, verify_index, verify_token_equivalence
 
@@ -83,3 +83,16 @@ def test_react_dom_memdb():
     verify_index(mem_index, source)
     verify_react_token_search(mem_index)
     verify_token_equivalence(index, mem_index)
+
+
+def test_unified_index_loading():
+    with open('tests/fixtures/indexed.sourcemap.js', 'rb') as f:
+        index_map = f.read()
+    assert isinstance(from_json(index_map), View)
+    assert isinstance(from_json(index_map, auto_flatten=False), Index)
+
+
+def test_unified_map_loading():
+    with open('tests/fixtures/jquery.min.map', 'rb') as f:
+        normal_map = f.read()
+    assert isinstance(from_json(normal_map), View)
