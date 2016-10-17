@@ -30,13 +30,13 @@ unsigned int lsm_view_get_token(const lsm_view_t *view, unsigned int idx,
                                 lsm_token_t *tok_out);
 int lsm_view_lookup_token(const lsm_view_t *view, unsigned int line,
                           unsigned int col, lsm_token_t *tok_out);
-unsigned int lsm_ivew_get_source_count(const lsm_view_t *view);
+unsigned int lsm_view_get_source_count(const lsm_view_t *view);
 const char *lsm_view_get_source_contents(const lsm_view_t *view,
                                          unsigned int src_id,
                                          unsigned int *len_out);
-unsigned int lsm_ivew_get_source_name(const lsm_view_t *view,
-                                      unsigned int src_id,
-                                      unsigned int *len_out);
+const char *lsm_view_get_source_name(const lsm_view_t *view,
+                                     unsigned int src_id,
+                                     unsigned int *len_out);
 char *lsm_view_dump_memdb(const lsm_view_t *view,
                           unsigned int *len_out);
 
