@@ -4,7 +4,7 @@ from contextlib import contextmanager
 from collections import namedtuple
 
 from ._sourcemapnative import ffi as _ffi
-from ._compat import to_bytes
+from ._compat import to_bytes, xrange
 from .exceptions import SourceMapError, IndexedSourceMap, special_errors
 
 
@@ -134,6 +134,22 @@ class View(object):
         rv = _lib.lsm_view_get_source_contents(self._get_ptr(), src_id, len_out)
         if rv:
             return _ffi.unpack(rv, len_out[0])
+
+    def get_source_name(self, src_id):
+        """Returns the name of the given source."""
+        len_out = _ffi.new('unsigned int *')
+        rv = _lib.lsm_view_get_source_name(self._get_ptr(), src_id, len_out)
+        if rv:
+            return decode_rust_str(rv, len_out[0])
+
+    def get_source_count(self):
+        """Returns the number of sources."""
+        return _lib.lsm_view_get_source_count(self._get_ptr())
+
+    def iter_sources(self):
+        """Iterates over all source names and IDs."""
+        for src_id in xrange(self.get_source_count()):
+            yield src_id, self.get_source_name(src_id)
 
     def __getitem__(self, idx):
         """Returns a token with a given index."""

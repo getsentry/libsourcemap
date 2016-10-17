@@ -108,6 +108,10 @@ impl<'a> MemDb<'a> {
         self.header().map(|x| x.index_size).unwrap_or(0)
     }
 
+    pub fn get_source_count(&self) -> u32 {
+        self.header().map(|x| x.sources_count).unwrap_or(0)
+    }
+
     pub fn get_token(&'a self, idx: u32) -> Option<Token<'a>> {
         self.index().ok().and_then(|index| {
             (&index.get(idx as usize)).map(|ii| {

@@ -124,12 +124,28 @@ pub unsafe fn lsm_view_lookup_token(view: *const View, line: c_uint, col: c_uint
 }
 
 #[no_mangle]
+pub unsafe fn lsm_view_get_source_count(view: *const View) -> c_uint {
+    (*view).get_source_count() as c_uint
+}
+
+#[no_mangle]
 pub unsafe fn lsm_view_get_source_contents(view: *const View, src_id: u32, len_out: *mut u32) -> *const u8 {
     match (*view).get_source_contents(src_id) {
         None => ptr::null(),
         Some(contents) => {
             *len_out = contents.len() as u32;
             contents.as_ptr()
+        }
+    }
+}
+
+#[no_mangle]
+pub unsafe fn lsm_view_get_source_name(view: *const View, src_id: u32, len_out: *mut u32) -> *const u8 {
+    match (*view).get_source(src_id) {
+        None => ptr::null(),
+        Some(name) => {
+            *len_out = name.len() as u32;
+            name.as_ptr()
         }
     }
 }

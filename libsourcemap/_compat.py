@@ -5,6 +5,7 @@ PY2 = sys.version_info[0] == 2
 
 if PY2:
     text_type = unicode
+    xrange = xrange
 
     def implements_to_string(cls):
         cls.__unicode__ = cls.__str__
@@ -12,6 +13,7 @@ if PY2:
         return cls
 else:
     text_type = str
+    xrange = range
     implements_to_string = lambda x: x
 
 

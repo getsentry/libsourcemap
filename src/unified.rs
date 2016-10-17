@@ -106,6 +106,20 @@ impl View {
         }
     }
 
+    pub fn get_source(&self, src_id: u32) -> Option<&str> {
+        match self.map {
+            MapRepr::Json(ref sm) => sm.get_source(src_id),
+            MapRepr::Mem(ref db) => db.get_source(src_id),
+        }
+    }
+
+    pub fn get_source_count(&self) -> u32 {
+        match self.map {
+            MapRepr::Json(ref sm) => sm.get_source_count(),
+            MapRepr::Mem(ref db) => db.get_source_count(),
+        }
+    }
+
     pub fn get_token_count(&self) -> u32 {
         match self.map {
             MapRepr::Json(ref sm) => sm.get_token_count(),
