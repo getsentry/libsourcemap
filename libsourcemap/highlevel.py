@@ -50,13 +50,19 @@ def convert_token(tok):
     )
 
 
-def parse_json(buffer):
-    """Parses a JSON string into either a view or an index."""
+def parse_json(buffer, auto_flatten=True):
+    """Parses a JSON string into either a view or an index.  If auto flatten
+    is enabled a sourcemap index that does not contain external references is
+    automatically flattened into a view.
+    """
     buffer = to_bytes(buffer)
     try:
         return View.from_json(buffer)
     except IndexedSourceMap:
-        return Index.from_json(buffer)
+        index = Index.from_json(buffer)
+        if auto_flatten and index.can_flatten:
+            return index.into_view()
+        return index
 
 
 class View(object):
@@ -175,6 +181,11 @@ class Index(object):
         if not self._ptr:
             raise RuntimeError('Index is closed')
         return self._ptr
+
+    @property
+    def can_flatten(self):
+        """True if the index does not contain external references."""
+        return _lib.lsm_index_can_flatten(self._get_ptr()) == 1
 
     def into_view(self):
         """Converts the index into a view"""

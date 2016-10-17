@@ -156,4 +156,13 @@ impl Index {
     pub fn into_view(self) -> Result<View> {
         View::from_sourcemap(try!(self.index.flatten()))
     }
+
+    pub fn can_flatten(&self) -> bool {
+        for section in self.index.sections() {
+            if let None = section.get_sourcemap() {
+                return false;
+            }
+        }
+        true
+    }
 }

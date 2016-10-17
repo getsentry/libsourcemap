@@ -167,6 +167,11 @@ pub unsafe fn lsm_index_free(idx: *mut Index) {
 }
 
 #[no_mangle]
+pub unsafe fn lsm_index_can_flatten(idx: *const Index) -> c_int {
+    if (*idx).can_flatten() { 1 } else { 0 }
+}
+
+#[no_mangle]
 pub unsafe fn lsm_index_into_view(idx: *mut Index, err_out: *mut CError) -> *mut View {
     let idx = Box::from_raw(idx);
     match idx.into_view() {

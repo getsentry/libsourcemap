@@ -38,6 +38,7 @@ char *lsm_view_dump_memdb(const lsm_view_t *view,
 
 lsm_index_t *lsm_index_from_json(char *bytes, unsigned int len, lsm_error_t *err);
 void lsm_index_free(lsm_index_t *index);
+int lsm_index_can_flatten(const lsm_index_t *index);
 lsm_view_t *lsm_index_into_view(lsm_index_t *index, lsm_error_t *err);
 
 void lsm_buffer_free(char *buf);
