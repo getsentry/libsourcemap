@@ -86,3 +86,11 @@ def test_unified_map_loading():
     with open('tests/fixtures/jquery.min.map', 'rb') as f:
         normal_map = f.read()
     assert isinstance(from_json(normal_map), View)
+
+
+def test_source_iteration():
+    source, min_map = get_fixtures('react-dom')
+    index = View.from_json(min_map)
+    mem_index = View.from_memdb(index.dump_memdb())
+    assert list(index.iter_sources()) == [(0, u'react-dom.js')]
+    assert list(mem_index.iter_sources()) == [(0, u'react-dom.js')]
