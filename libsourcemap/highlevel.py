@@ -179,12 +179,11 @@ class Index(object):
     def into_view(self):
         """Converts the index into a view"""
         with capture_err() as (err_out, check):
-            rv = View._from_ptr(check(_lib.lsm_index_into_view(
-                self._get_ptr(), err_out)))
-            # If we don't fail, we already freed and as such should zero
-            # out our pointer
-            self._ptr = None
-            return rv
+            try:
+                return View._from_ptr(check(_lib.lsm_index_into_view(
+                    self._get_ptr(), err_out)))
+            finally:
+                self._ptr = None
 
     def __del__(self):
         try:
