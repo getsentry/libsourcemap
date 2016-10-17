@@ -1,6 +1,7 @@
 from libsourcemap import View, Index, from_json
 
-from testutils import get_fixtures, verify_index, verify_token_equivalence
+from testutils import get_fixtures, verify_index, verify_token_equivalence, \
+    verify_token_search
 
 
 def test_jquery():
@@ -55,18 +56,7 @@ def verify_react_token_search(index):
     assert react_token.src_id == 0
     assert react_token.src == 'react-dom.js'
     assert react_token.name == 'React'
-
-    for idx, token in enumerate(index):
-        if not token.name:
-            continue
-        try:
-            next_token = index[idx + 1]
-            rng = range(token.dst_col, next_token.dst_col)
-        except LookupError:
-            rng = (token.dst_col,)
-        for col in rng:
-            token_match = index.lookup_token(token.dst_line, col)
-            assert token_match == token
+    verify_token_search(index)
 
 
 def test_react_dom():

@@ -1,6 +1,6 @@
 from libsourcemap import Index
 
-from testutils import verify_index
+from testutils import verify_index, verify_token_search
 
 
 def test_load_index():
@@ -19,3 +19,4 @@ def test_load_index():
         'file1.js': f1,
         'file2.js': f2,
     })
+    verify_token_search(view)

@@ -48,3 +48,17 @@ def verify_index(index, source):
 def verify_token_equivalence(index, mem_index):
     for tok1, tok2 in izip(index, mem_index):
         assert tok1 == tok2
+
+
+def verify_token_search(index):
+    for idx, token in enumerate(index):
+        if not token.name:
+            continue
+        try:
+            next_token = index[idx + 1]
+            rng = range(token.dst_col, next_token.dst_col)
+        except LookupError:
+            rng = (token.dst_col,)
+        for col in rng:
+            token_match = index.lookup_token(token.dst_line, col)
+            assert token_match == token
