@@ -9,6 +9,7 @@ from .exceptions import SourceMapError, IndexedSourceMap, special_errors
 
 
 _lib = _ffi.dlopen(os.path.join(os.path.dirname(__file__), '_libsourcemap.so'))
+_lib.lsm_init()
 
 
 Token = namedtuple('Token', ['dst_line', 'dst_col', 'src', 'src_line',

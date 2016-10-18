@@ -87,6 +87,17 @@ unsafe fn boxed_landingpad<F: FnOnce() -> Result<T>, T>(
     }, err_out)
 }
 
+fn silent_panic_handler(_pi: &panic::PanicInfo) {
+    // don't do anything here.  This disables the default printing of
+    // panics to stderr which we really don't care about here.
+}
+
+
+#[no_mangle]
+pub unsafe fn lsm_init() {
+    panic::set_hook(Box::new(silent_panic_handler));
+}
+
 #[no_mangle]
 pub unsafe fn lsm_view_from_json(bytes: *const u8, len: c_uint, err_out: *mut CError) -> *mut View {
     boxed_landingpad(|| {
@@ -148,7 +159,7 @@ pub unsafe fn lsm_view_get_token(view: *const View, idx: c_uint, out: *mut Token
 
 #[no_mangle]
 pub unsafe fn lsm_view_lookup_token(view: *const View, line: c_uint, col: c_uint,
-                                    out: *mut Token, err_out: *mut CError) -> c_int {
+                                    out: *mut Token) -> c_int {
     // XXX: this silences panics
     panic::catch_unwind(|| {
         match (*view).lookup_token(line, col) {

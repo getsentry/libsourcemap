@@ -21,6 +21,8 @@ typedef struct lsm_error_s {
     int code;
 } lsm_error_t;
 
+void lsm_init(void);
+
 lsm_view_t *lsm_view_from_json(char *bytes, unsigned int len, lsm_error_t *err);
 lsm_view_t *lsm_view_from_memdb(char *bytes, unsigned int len, lsm_error_t *err);
 lsm_view_t *lsm_view_from_memdb_file(char *path, lsm_error_t *err);
