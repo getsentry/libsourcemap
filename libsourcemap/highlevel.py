@@ -28,10 +28,7 @@ def capture_err():
         finally:
             _lib.lsm_buffer_free(err[0].message)
         raise exc
-    try:
-        yield err, check
-    finally:
-        pass
+    yield err, check
 
 
 def decode_rust_str(ptr, len):
