@@ -12,6 +12,9 @@ error_chain! {
     }
 
     errors {
+        InternalError {
+            description("Internal library error")
+        }
         UnsupportedMemDbVersion {
             description("Unsupported memdb version")
         }

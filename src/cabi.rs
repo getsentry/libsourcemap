@@ -1,6 +1,7 @@
 use std::ptr;
 use std::mem;
 use std::slice;
+use std::panic;
 use std::ffi::CStr;
 use std::os::raw::{c_int, c_uint, c_char};
 
@@ -67,28 +68,44 @@ unsafe fn notify_err<T>(err: Error, err_out: *mut CError) -> *mut T {
     0 as *mut T
 }
 
-unsafe fn box_or_err<T>(rv: Result<T>, err_out: *mut CError) -> *mut T {
-    match rv {
+unsafe fn landingpad<F: FnOnce() -> *mut T + panic::UnwindSafe, T>(
+    f: F, err_out: *mut CError) -> *mut T
+{
+    match panic::catch_unwind(f) {
+        Ok(rv) => rv,
+        Err(_) => notify_err(ErrorKind::InternalError.into(), err_out)
+    }
+}
+
+unsafe fn boxed_landingpad<F: FnOnce() -> Result<T>, T>(
+    f: F, err_out: *mut CError) -> *mut T
+    where F: panic::UnwindSafe
+{
+    landingpad(|| match f() {
         Ok(v) => Box::into_raw(Box::new(v)),
         Err(err) => notify_err(err, err_out)
-    }
+    }, err_out)
 }
 
 #[no_mangle]
 pub unsafe fn lsm_view_from_json(bytes: *const u8, len: c_uint, err_out: *mut CError) -> *mut View {
-    box_or_err(View::json_from_slice(slice::from_raw_parts(
-        mem::transmute(bytes),
-        len as usize
-    )), err_out)
+    boxed_landingpad(|| {
+        View::json_from_slice(slice::from_raw_parts(
+            mem::transmute(bytes),
+            len as usize
+        ))
+    }, err_out)
 }
 
 #[no_mangle]
 pub unsafe fn lsm_view_from_memdb(bytes: *const u8, len: c_uint, err_out: *mut CError) -> *mut View {
     // XXX: this currently copies because that's safer.  Consider improving this?
-    box_or_err(View::memdb_from_vec(slice::from_raw_parts(
-        mem::transmute(bytes),
-        len as usize
-    ).to_vec()), err_out)
+    boxed_landingpad(|| {
+        View::memdb_from_vec(slice::from_raw_parts(
+            mem::transmute(bytes),
+            len as usize
+        ).to_vec())
+    }, err_out)
 }
 
 unsafe fn load_memdb_from_path(path: &CStr) -> Result<View> {
@@ -97,7 +114,9 @@ unsafe fn load_memdb_from_path(path: &CStr) -> Result<View> {
 
 #[no_mangle]
 pub unsafe fn lsm_view_from_memdb_file(path: *const c_char, err_out: *mut CError) -> *mut View {
-    box_or_err(load_memdb_from_path(CStr::from_ptr(path)), err_out)
+    boxed_landingpad(|| {
+        load_memdb_from_path(CStr::from_ptr(path))
+    }, err_out)
 }
 
 #[no_mangle]
@@ -178,10 +197,12 @@ pub unsafe fn lsm_buffer_free(buf: *mut u8) {
 
 #[no_mangle]
 pub unsafe fn lsm_index_from_json(bytes: *const u8, len: c_uint, err_out: *mut CError) -> *mut Index {
-    box_or_err(Index::json_from_slice(slice::from_raw_parts(
-        mem::transmute(bytes),
-        len as usize
-    )), err_out)
+    boxed_landingpad(|| {
+        Index::json_from_slice(slice::from_raw_parts(
+            mem::transmute(bytes),
+            len as usize
+        ))
+    }, err_out)
 }
 
 #[no_mangle]
@@ -193,11 +214,14 @@ pub unsafe fn lsm_index_free(idx: *mut Index) {
 
 #[no_mangle]
 pub unsafe fn lsm_index_can_flatten(idx: *const Index) -> c_int {
-    if (*idx).can_flatten() { 1 } else { 0 }
+    panic::catch_unwind(|| {
+        if (*idx).can_flatten() { 1 } else { 0 }
+    }).unwrap_or(0)
 }
 
 #[no_mangle]
 pub unsafe fn lsm_index_into_view(idx: *mut Index, err_out: *mut CError) -> *mut View {
-    let idx = Box::from_raw(idx);
-    box_or_err(idx.into_view(), err_out)
+    boxed_landingpad(|| {
+        Box::from_raw(idx).into_view()
+    }, err_out)
 }
