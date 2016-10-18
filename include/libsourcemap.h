@@ -39,7 +39,8 @@ const char *lsm_view_get_source_name(const lsm_view_t *view,
                                      unsigned int src_id,
                                      unsigned int *len_out);
 char *lsm_view_dump_memdb(const lsm_view_t *view,
-                          unsigned int *len_out);
+                          unsigned int *len_out,
+                          lsm_error_t *err);
 
 lsm_index_t *lsm_index_from_json(char *bytes, unsigned int len, lsm_error_t *err);
 void lsm_index_free(lsm_index_t *index);

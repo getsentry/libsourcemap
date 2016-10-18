@@ -128,30 +128,37 @@ pub unsafe fn lsm_view_free(view: *mut View) {
 
 #[no_mangle]
 pub unsafe fn lsm_view_get_token_count(view: *const View) -> c_uint {
-    (*view).get_token_count() as c_uint
+    // XXX: this silences panics
+    panic::catch_unwind(|| (*view).get_token_count() as c_uint).unwrap_or(0)
 }
 
 #[no_mangle]
 pub unsafe fn lsm_view_get_token(view: *const View, idx: c_uint, out: *mut Token) -> c_int {
-    match (*view).get_token(idx as u32) {
-        None => 0,
-        Some(tm) => {
-            set_token(out, &tm);
-            1
+    // XXX: this silences panics
+    panic::catch_unwind(|| {
+        match (*view).get_token(idx as u32) {
+            None => 0,
+            Some(tm) => {
+                set_token(out, &tm);
+                1
+            }
         }
-    }
+    }).unwrap_or(0)
 }
 
 #[no_mangle]
 pub unsafe fn lsm_view_lookup_token(view: *const View, line: c_uint, col: c_uint,
-                                    out: *mut Token) -> c_int {
-    match (*view).lookup_token(line, col) {
-        None => 0,
-        Some(tm) => {
-            set_token(out, &tm);
-            1
+                                    out: *mut Token, err_out: *mut CError) -> c_int {
+    // XXX: this silences panics
+    panic::catch_unwind(|| {
+        match (*view).lookup_token(line, col) {
+            None => 0,
+            Some(tm) => {
+                set_token(out, &tm);
+                1
+            }
         }
-    }
+    }).unwrap_or(0)
 }
 
 #[no_mangle]
@@ -161,31 +168,39 @@ pub unsafe fn lsm_view_get_source_count(view: *const View) -> c_uint {
 
 #[no_mangle]
 pub unsafe fn lsm_view_get_source_contents(view: *const View, src_id: u32, len_out: *mut u32) -> *const u8 {
-    match (*view).get_source_contents(src_id) {
-        None => ptr::null(),
-        Some(contents) => {
-            *len_out = contents.len() as u32;
-            contents.as_ptr()
+    // XXX: this silences panics
+    panic::catch_unwind(|| {
+        match (*view).get_source_contents(src_id) {
+            None => ptr::null(),
+            Some(contents) => {
+                *len_out = contents.len() as u32;
+                contents.as_ptr()
+            }
         }
-    }
+    }).unwrap_or(ptr::null())
 }
 
 #[no_mangle]
 pub unsafe fn lsm_view_get_source_name(view: *const View, src_id: u32, len_out: *mut u32) -> *const u8 {
-    match (*view).get_source(src_id) {
-        None => ptr::null(),
-        Some(name) => {
-            *len_out = name.len() as u32;
-            name.as_ptr()
+    // XXX: this silences panics
+    panic::catch_unwind(|| {
+        match (*view).get_source(src_id) {
+            None => ptr::null(),
+            Some(name) => {
+                *len_out = name.len() as u32;
+                name.as_ptr()
+            }
         }
-    }
+    }).unwrap_or(ptr::null())
 }
 
 #[no_mangle]
-pub unsafe fn lsm_view_dump_memdb(view: *mut View, len_out: *mut c_uint) -> *mut u8 {
-    let memdb = (*view).dump_memdb();
-    *len_out = memdb.len() as c_uint;
-    Box::into_raw(memdb.into_boxed_slice()) as *mut u8
+pub unsafe fn lsm_view_dump_memdb(view: *mut View, len_out: *mut c_uint, err_out: *mut CError) -> *mut u8 {
+    landingpad(|| {
+        let memdb = (*view).dump_memdb();
+        *len_out = memdb.len() as c_uint;
+        Box::into_raw(memdb.into_boxed_slice()) as *mut u8
+    }, err_out)
 }
 
 #[no_mangle]

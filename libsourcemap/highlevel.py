@@ -120,7 +120,9 @@ class View(object):
     def dump_memdb(self):
         """Dumps a sourcemap in MemDB format into bytes."""
         len_out = _ffi.new('unsigned int *')
-        buf = _lib.lsm_view_dump_memdb(self._get_ptr(), len_out)
+        with capture_err() as (err_out, check):
+            buf = check(_lib.lsm_view_dump_memdb(
+                self._get_ptr(), len_out, err_out))
         try:
             rv = _ffi.unpack(buf, len_out[0])
         finally:
