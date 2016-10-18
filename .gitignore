@@ -10,3 +10,5 @@ venv
 libsourcemap/_sourcemapnative.py
 .cache
 .cargo
+*.pyc
+*.pyo
