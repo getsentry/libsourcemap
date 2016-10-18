@@ -66,27 +66,28 @@ unsafe fn notify_err<T>(err: Error, err_out: *mut CError) -> *mut T {
     0 as *mut T
 }
 
-#[no_mangle]
-pub unsafe fn lsm_view_from_json(bytes: *const u8, len: c_uint, err_out: *mut CError) -> *mut View {
-    match View::json_from_slice(slice::from_raw_parts(
-        mem::transmute(bytes),
-        len as usize
-    )) {
+unsafe fn box_or_err<T>(rv: Result<T>, err_out: *mut CError) -> *mut T {
+    match rv {
         Ok(v) => Box::into_raw(Box::new(v)),
         Err(err) => notify_err(err, err_out)
     }
 }
 
 #[no_mangle]
-pub unsafe fn lsm_view_from_memdb(bytes: *const u8, len: c_uint, err_out: *mut CError) -> *mut View {
-    // XXX: this currently copies because that's safer.  Consider improving this?
-    match View::memdb_from_vec(slice::from_raw_parts(
+pub unsafe fn lsm_view_from_json(bytes: *const u8, len: c_uint, err_out: *mut CError) -> *mut View {
+    box_or_err(View::json_from_slice(slice::from_raw_parts(
         mem::transmute(bytes),
         len as usize
-    ).to_vec()) {
-        Ok(v) => Box::into_raw(Box::new(v)),
-        Err(err) => notify_err(err, err_out)
-    }
+    )), err_out)
+}
+
+#[no_mangle]
+pub unsafe fn lsm_view_from_memdb(bytes: *const u8, len: c_uint, err_out: *mut CError) -> *mut View {
+    // XXX: this currently copies because that's safer.  Consider improving this?
+    box_or_err(View::memdb_from_vec(slice::from_raw_parts(
+        mem::transmute(bytes),
+        len as usize
+    ).to_vec()), err_out)
 }
 
 unsafe fn load_memdb_from_path(path: &CStr) -> Result<View> {
@@ -95,10 +96,7 @@ unsafe fn load_memdb_from_path(path: &CStr) -> Result<View> {
 
 #[no_mangle]
 pub unsafe fn lsm_view_from_memdb_file(path: *const c_char, err_out: *mut CError) -> *mut View {
-    match load_memdb_from_path(CStr::from_ptr(path)) {
-        Ok(v) => Box::into_raw(Box::new(v)),
-        Err(err) => notify_err(err, err_out)
-    }
+    box_or_err(load_memdb_from_path(CStr::from_ptr(path)), err_out)
 }
 
 #[no_mangle]
@@ -179,13 +177,10 @@ pub unsafe fn lsm_buffer_free(buf: *mut u8) {
 
 #[no_mangle]
 pub unsafe fn lsm_index_from_json(bytes: *const u8, len: c_uint, err_out: *mut CError) -> *mut Index {
-    match Index::json_from_slice(slice::from_raw_parts(
+    box_or_err(Index::json_from_slice(slice::from_raw_parts(
         mem::transmute(bytes),
         len as usize
-    )) {
-        Ok(v) => Box::into_raw(Box::new(v)),
-        Err(err) => notify_err(err, err_out)
-    }
+    )), err_out)
 }
 
 #[no_mangle]
@@ -203,8 +198,5 @@ pub unsafe fn lsm_index_can_flatten(idx: *const Index) -> c_int {
 #[no_mangle]
 pub unsafe fn lsm_index_into_view(idx: *mut Index, err_out: *mut CError) -> *mut View {
     let idx = Box::from_raw(idx);
-    match idx.into_view() {
-        Ok(view) => Box::into_raw(Box::new(view)),
-        Err(err) => notify_err(err, err_out)
-    }
+    box_or_err(idx.into_view(), err_out)
 }
