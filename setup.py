@@ -88,10 +88,10 @@ setup(
     zip_safe=False,
     platforms='any',
     install_requires=[
-        'cffi>=1.0.0',
+        'cffi>=1.6.0',
     ],
     setup_requires=[
-        'cffi>=1.0.0'
+        'cffi>=1.6.0'
     ],
     classifiers=[
         'Intended Audience :: Developers',
