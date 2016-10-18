@@ -15,6 +15,10 @@ class SourceMapError(Exception):
 class IndexedSourceMap(SourceMapError):
     """Raised if a sourcemap is indexed."""
 
+    def __init__(self, message, index=None):
+        SourceMapError.__init__(self, message)
+        self.index = index
+
 
 class BadJson(SourceMapError):
     """Raised if bad JSON data was encountered."""

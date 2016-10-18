@@ -50,18 +50,22 @@ def convert_token(tok):
     )
 
 
-def from_json(buffer, auto_flatten=True):
+def from_json(buffer, auto_flatten=True, raise_for_index=True):
     """Parses a JSON string into either a view or an index.  If auto flatten
     is enabled a sourcemap index that does not contain external references is
-    automatically flattened into a view.
+    automatically flattened into a view.  By default if an index would be
+    returned an `IndexedSourceMap` error is raised instead which holds the
+    index.
     """
     buffer = to_bytes(buffer)
     try:
         return View.from_json(buffer)
-    except IndexedSourceMap:
+    except IndexedSourceMap as e:
         index = Index.from_json(buffer)
         if auto_flatten and index.can_flatten:
             return index.into_view()
+        if raise_for_index:
+            raise IndexedSourceMap(e.message, index=index)
         return index
 
 

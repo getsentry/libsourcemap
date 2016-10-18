@@ -1,4 +1,4 @@
-from libsourcemap import View, Index, from_json
+from libsourcemap import View, Index, from_json, IndexedSourceMap
 
 from testutils import get_fixtures, verify_index, verify_token_equivalence, \
     verify_token_search
@@ -79,7 +79,14 @@ def test_unified_index_loading():
     with open('tests/fixtures/indexed.sourcemap.js', 'rb') as f:
         index_map = f.read()
     assert isinstance(from_json(index_map), View)
-    assert isinstance(from_json(index_map, auto_flatten=False), Index)
+    assert isinstance(from_json(index_map, auto_flatten=False,
+                                raise_for_index=False), Index)
+    try:
+        from_json(index_map, auto_flatten=False)
+    except IndexedSourceMap as e:
+        assert isinstance(e.index, Index)
+    else:
+        raise RuntimeError('Expectd an exception')
 
 
 def test_unified_map_loading():
