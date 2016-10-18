@@ -1,10 +1,11 @@
 use std::ptr;
 use std::mem;
 use std::slice;
-use std::os::raw::{c_int, c_uint};
+use std::ffi::CStr;
+use std::os::raw::{c_int, c_uint, c_char};
 
 use sourcemap::Error as SourceMapError;
-use errors::{Error, ErrorKind};
+use errors::{Error, ErrorKind, Result};
 use unified::{View, TokenMatch, Index};
 
 
@@ -83,6 +84,18 @@ pub unsafe fn lsm_view_from_memdb(bytes: *const u8, len: c_uint, err_out: *mut C
         mem::transmute(bytes),
         len as usize
     ).to_vec()) {
+        Ok(v) => Box::into_raw(Box::new(v)),
+        Err(err) => notify_err(err, err_out)
+    }
+}
+
+unsafe fn load_memdb_from_path(path: &CStr) -> Result<View> {
+    View::memdb_from_path(try!(path.to_str()))
+}
+
+#[no_mangle]
+pub unsafe fn lsm_view_from_memdb_file(path: *const c_char, err_out: *mut CError) -> *mut View {
+    match load_memdb_from_path(CStr::from_ptr(path)) {
         Ok(v) => Box::into_raw(Box::new(v)),
         Err(err) => notify_err(err, err_out)
     }

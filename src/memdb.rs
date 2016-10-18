@@ -3,8 +3,10 @@ use std::mem;
 use std::fmt;
 use std::slice;
 use std::io;
+use std::path::Path;
 use std::io::{Write, Seek, SeekFrom};
 use std::borrow::Cow;
+use memmap::{Mmap, Protection};
 
 use sourcemap::{RawToken, SourceMap};
 
@@ -34,8 +36,13 @@ pub struct MapHead {
     pub source_contents_count: u32,
 }
 
+enum Backing<'a> {
+    Buf(Cow<'a, [u8]>),
+    Mmap(Mmap),
+}
+
 pub struct MemDb<'a> {
-    buffer: Cow<'a, [u8]>,
+    backing: Backing<'a>
 }
 
 pub struct Token<'a> {
@@ -70,18 +77,21 @@ fn unpack_ids(packed_ids: u32) -> (u32, u32) {
     (src_id, name_id)
 }
 
+fn verify_version<'a>(rv: MemDb<'a>) -> Result<MemDb<'a>> {
+    if try!(rv.header()).version != 1 {
+        Err(ErrorKind::UnsupportedMemDbVersion.into())
+    } else {
+        Ok(rv)
+    }
+}
+
 
 impl<'a> MemDb<'a> {
 
     pub fn from_cow(cow: Cow<'a, [u8]>) -> Result<MemDb<'a>> {
-        let rv = MemDb {
-            buffer: cow,
-        };
-        if try!(rv.header()).version != 1 {
-            Err(ErrorKind::UnsupportedMemDbVersion.into())
-        } else {
-            Ok(rv)
-        }
+        verify_version(MemDb {
+            backing: Backing::Buf(cow),
+        })
     }
 
     pub fn from_slice(buffer: &'a [u8]) -> Result<MemDb<'a>> {
@@ -90,6 +100,13 @@ impl<'a> MemDb<'a> {
 
     pub fn from_vec(buffer: Vec<u8>) -> Result<MemDb<'a>> {
         MemDb::from_cow(Cow::Owned(buffer))
+    }
+
+    pub fn from_path<P: AsRef<Path>>(path: P) -> Result<MemDb<'a>> {
+        let mmap = try!(Mmap::open_path(path, Protection::Read));
+        verify_version(MemDb {
+            backing: Backing::Mmap(mmap),
+        })
     }
 
     pub fn get_name(&self, name_id: u32) -> Option<&str> {
@@ -156,16 +173,21 @@ impl<'a> MemDb<'a> {
         }
     }
 
+    #[inline(always)]
     pub fn buffer(&self) -> &[u8] {
-        &self.buffer
+        match self.backing {
+            Backing::Buf(ref buf) => buf,
+            Backing::Mmap(ref mmap) => unsafe { mmap.as_slice() }
+        }
     }
 
     fn get_data(&self, start: usize, len: usize) -> Result<&[u8]> {
+        let buffer = self.buffer();
         let end = start.wrapping_add(len);
-        if end < start || end > self.buffer.len() {
+        if end < start || end > buffer.len() {
             Err(ErrorKind::BadMemDb.into())
         } else {
-            Ok(&self.buffer[start..end])
+            Ok(&buffer[start..end])
         }
     }
 

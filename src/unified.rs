@@ -1,4 +1,5 @@
 use std::io::{Read, Cursor};
+use std::path::Path;
 
 use sourcemap::{SourceMap, SourceMapIndex};
 
@@ -46,6 +47,12 @@ impl View {
     pub fn memdb_from_vec(vec: Vec<u8>) -> Result<View> {
         Ok(View {
             map: MapRepr::Mem(try!(MemDb::from_vec(vec)))
+        })
+    }
+
+    pub fn memdb_from_path<P: AsRef<Path>>(path: P) -> Result<View> {
+        Ok(View {
+            map: MapRepr::Mem(try!(MemDb::from_path(path)))
         })
     }
 

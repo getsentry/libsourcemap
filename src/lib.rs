@@ -1,6 +1,7 @@
 #![recursion_limit = "1024"]
 
 extern crate sourcemap;
+extern crate memmap;
 
 #[macro_use]
 extern crate error_chain;

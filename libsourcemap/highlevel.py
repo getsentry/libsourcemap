@@ -99,6 +99,14 @@ class View(object):
                 buffer, len(buffer), err_out)))
 
     @staticmethod
+    def from_memdb_file(path):
+        """Creates a sourcemap view from MemDB at a given file."""
+        path = to_bytes(path)
+        with capture_err() as (err_out, check):
+            return View._from_ptr(check(_lib.lsm_view_from_memdb_file(
+                path, err_out)))
+
+    @staticmethod
     def _from_ptr(ptr):
         rv = object.__new__(View)
         rv._ptr = ptr
