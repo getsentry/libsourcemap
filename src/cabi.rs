@@ -37,6 +37,7 @@ fn get_error_code_from_kind(kind: &ErrorKind) -> c_int {
         ErrorKind::SourceMapError(SourceMapError::BadJson(_, _, _)) => 3,
         ErrorKind::SourceMapError(SourceMapError::CannotFlatten(_)) => 4,
         ErrorKind::UnsupportedMemDbVersion => 5,
+        ErrorKind::IoError(_) => 6,
         _ => 1,
     }
 }

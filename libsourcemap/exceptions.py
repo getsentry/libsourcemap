@@ -32,9 +32,14 @@ class UnsupportedMemDbVersion(SourceMapError):
     """Raised if an unsupported memdb is loaded."""
 
 
+class BadIo(SourceMapError):
+    """Raised if an IO error happened."""
+
+
 special_errors = {
     2: IndexedSourceMap,
     3: BadJson,
     4: CannotFlatten,
     5: UnsupportedMemDbVersion,
+    6: BadIo,
 }

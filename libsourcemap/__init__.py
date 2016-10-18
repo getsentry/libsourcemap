@@ -1,6 +1,6 @@
 from .highlevel import from_json, View, Token, Index
 from .exceptions import SourceMapError, IndexedSourceMap, BadJson, \
-    CannotFlatten, UnsupportedMemDbVersion
+    CannotFlatten, UnsupportedMemDbVersion, BadIo
 
 __all__ = [
     # General stuff
@@ -8,5 +8,5 @@ __all__ = [
 
     # Exceptions
     'SourceMapError', 'IndexedSourceMap', 'BadJson', 'CannotFlatten',
-    'UnsupportedMemDbVersion'
+    'UnsupportedMemDbVersion', 'BadIo',
 ]
