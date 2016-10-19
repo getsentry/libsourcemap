@@ -1,5 +1,4 @@
 use std::ptr;
-use std::mem;
 use std::slice;
 use std::panic;
 use std::ffi::CStr;
@@ -102,7 +101,7 @@ pub unsafe fn lsm_init() {
 pub unsafe fn lsm_view_from_json(bytes: *const u8, len: c_uint, err_out: *mut CError) -> *mut View {
     boxed_landingpad(|| {
         View::json_from_slice(slice::from_raw_parts(
-            mem::transmute(bytes),
+            bytes,
             len as usize
         ))
     }, err_out)
@@ -113,7 +112,7 @@ pub unsafe fn lsm_view_from_memdb(bytes: *const u8, len: c_uint, err_out: *mut C
     // XXX: this currently copies because that's safer.  Consider improving this?
     boxed_landingpad(|| {
         View::memdb_from_vec(slice::from_raw_parts(
-            mem::transmute(bytes),
+            bytes,
             len as usize
         ).to_vec())
     }, err_out)
@@ -225,7 +224,7 @@ pub unsafe fn lsm_buffer_free(buf: *mut u8) {
 pub unsafe fn lsm_index_from_json(bytes: *const u8, len: c_uint, err_out: *mut CError) -> *mut Index {
     boxed_landingpad(|| {
         Index::json_from_slice(slice::from_raw_parts(
-            mem::transmute(bytes),
+            bytes,
             len as usize
         ))
     }, err_out)

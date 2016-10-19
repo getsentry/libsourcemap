@@ -11,7 +11,6 @@ def _to_source(x):
 
 ffi = FFI()
 ffi.cdef(_to_source(subprocess.Popen([
-    'cc', '-E', '-DPYTHON_HEADER',
-    'include/libsourcemap.h'],
+    'cc', '-E', 'include/libsourcemap.h'],
     stdout=subprocess.PIPE).communicate()[0]))
 ffi.set_source('libsourcemap._sourcemapnative', None)
