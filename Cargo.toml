@@ -1,6 +1,6 @@
 [package]
 name = "libsourcemap"
-version = "0.4.4"
+version = "0.4.5"
 authors = ["Armin Ronacher <armin.ronacher@active-4.com>"]
 
 [lib]
