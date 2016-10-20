@@ -72,7 +72,7 @@ class BinaryDistribution(Distribution):
 
 setup(
     name='libsourcemap',
-    version='0.4.2',
+    version='0.4.3',
     url='http://github.com/getsentry/libsourcemap',
     description='Helps working with sourcemaps.',
     license='BSD',
