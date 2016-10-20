@@ -93,12 +93,12 @@ fn silent_panic_handler(_pi: &panic::PanicInfo) {
 
 
 #[no_mangle]
-pub unsafe fn lsm_init() {
+pub unsafe extern "C" fn lsm_init() {
     panic::set_hook(Box::new(silent_panic_handler));
 }
 
 #[no_mangle]
-pub unsafe fn lsm_view_from_json(bytes: *const u8, len: c_uint, err_out: *mut CError) -> *mut View {
+pub unsafe extern "C" fn lsm_view_from_json(bytes: *const u8, len: c_uint, err_out: *mut CError) -> *mut View {
     boxed_landingpad(|| {
         View::json_from_slice(slice::from_raw_parts(
             bytes,
@@ -108,7 +108,7 @@ pub unsafe fn lsm_view_from_json(bytes: *const u8, len: c_uint, err_out: *mut CE
 }
 
 #[no_mangle]
-pub unsafe fn lsm_view_from_memdb(bytes: *const u8, len: c_uint, err_out: *mut CError) -> *mut View {
+pub unsafe extern "C" fn lsm_view_from_memdb(bytes: *const u8, len: c_uint, err_out: *mut CError) -> *mut View {
     // XXX: this currently copies because that's safer.  Consider improving this?
     boxed_landingpad(|| {
         View::memdb_from_vec(slice::from_raw_parts(
@@ -123,27 +123,27 @@ unsafe fn load_memdb_from_path(path: &CStr) -> Result<View> {
 }
 
 #[no_mangle]
-pub unsafe fn lsm_view_from_memdb_file(path: *const c_char, err_out: *mut CError) -> *mut View {
+pub unsafe extern "C" fn lsm_view_from_memdb_file(path: *const c_char, err_out: *mut CError) -> *mut View {
     boxed_landingpad(|| {
         load_memdb_from_path(CStr::from_ptr(path))
     }, err_out)
 }
 
 #[no_mangle]
-pub unsafe fn lsm_view_free(view: *mut View) {
+pub unsafe extern "C" fn lsm_view_free(view: *mut View) {
     if !view.is_null() {
         Box::from_raw(view);
     }
 }
 
 #[no_mangle]
-pub unsafe fn lsm_view_get_token_count(view: *const View) -> c_uint {
+pub unsafe extern "C" fn lsm_view_get_token_count(view: *const View) -> c_uint {
     // XXX: this silences panics
     panic::catch_unwind(|| (*view).get_token_count() as c_uint).unwrap_or(0)
 }
 
 #[no_mangle]
-pub unsafe fn lsm_view_get_token(view: *const View, idx: c_uint, out: *mut Token) -> c_int {
+pub unsafe extern "C" fn lsm_view_get_token(view: *const View, idx: c_uint, out: *mut Token) -> c_int {
     // XXX: this silences panics
     panic::catch_unwind(|| {
         match (*view).get_token(idx as u32) {
@@ -157,7 +157,7 @@ pub unsafe fn lsm_view_get_token(view: *const View, idx: c_uint, out: *mut Token
 }
 
 #[no_mangle]
-pub unsafe fn lsm_view_lookup_token(view: *const View, line: c_uint, col: c_uint,
+pub unsafe extern "C" fn lsm_view_lookup_token(view: *const View, line: c_uint, col: c_uint,
                                     out: *mut Token) -> c_int {
     // XXX: this silences panics
     panic::catch_unwind(|| {
@@ -172,12 +172,12 @@ pub unsafe fn lsm_view_lookup_token(view: *const View, line: c_uint, col: c_uint
 }
 
 #[no_mangle]
-pub unsafe fn lsm_view_get_source_count(view: *const View) -> c_uint {
+pub unsafe extern "C" fn lsm_view_get_source_count(view: *const View) -> c_uint {
     (*view).get_source_count() as c_uint
 }
 
 #[no_mangle]
-pub unsafe fn lsm_view_get_source_contents(view: *const View, src_id: u32, len_out: *mut u32) -> *const u8 {
+pub unsafe extern "C" fn lsm_view_get_source_contents(view: *const View, src_id: u32, len_out: *mut u32) -> *const u8 {
     // XXX: this silences panics
     panic::catch_unwind(|| {
         match (*view).get_source_contents(src_id) {
@@ -191,7 +191,7 @@ pub unsafe fn lsm_view_get_source_contents(view: *const View, src_id: u32, len_o
 }
 
 #[no_mangle]
-pub unsafe fn lsm_view_get_source_name(view: *const View, src_id: u32, len_out: *mut u32) -> *const u8 {
+pub unsafe extern "C" fn lsm_view_get_source_name(view: *const View, src_id: u32, len_out: *mut u32) -> *const u8 {
     // XXX: this silences panics
     panic::catch_unwind(|| {
         match (*view).get_source(src_id) {
@@ -205,7 +205,7 @@ pub unsafe fn lsm_view_get_source_name(view: *const View, src_id: u32, len_out: 
 }
 
 #[no_mangle]
-pub unsafe fn lsm_view_dump_memdb(view: *mut View, len_out: *mut c_uint, err_out: *mut CError) -> *mut u8 {
+pub unsafe extern "C" fn lsm_view_dump_memdb(view: *mut View, len_out: *mut c_uint, err_out: *mut CError) -> *mut u8 {
     landingpad(|| {
         let memdb = (*view).dump_memdb();
         *len_out = memdb.len() as c_uint;
@@ -214,14 +214,14 @@ pub unsafe fn lsm_view_dump_memdb(view: *mut View, len_out: *mut c_uint, err_out
 }
 
 #[no_mangle]
-pub unsafe fn lsm_buffer_free(buf: *mut u8) {
+pub unsafe extern "C" fn lsm_buffer_free(buf: *mut u8) {
     if !buf.is_null() {
         Box::from_raw(buf);
     }
 }
 
 #[no_mangle]
-pub unsafe fn lsm_index_from_json(bytes: *const u8, len: c_uint, err_out: *mut CError) -> *mut Index {
+pub unsafe extern "C" fn lsm_index_from_json(bytes: *const u8, len: c_uint, err_out: *mut CError) -> *mut Index {
     boxed_landingpad(|| {
         Index::json_from_slice(slice::from_raw_parts(
             bytes,
@@ -231,21 +231,21 @@ pub unsafe fn lsm_index_from_json(bytes: *const u8, len: c_uint, err_out: *mut C
 }
 
 #[no_mangle]
-pub unsafe fn lsm_index_free(idx: *mut Index) {
+pub unsafe extern "C" fn lsm_index_free(idx: *mut Index) {
     if !idx.is_null() {
         Box::from_raw(idx);
     }
 }
 
 #[no_mangle]
-pub unsafe fn lsm_index_can_flatten(idx: *const Index) -> c_int {
+pub unsafe extern "C" fn lsm_index_can_flatten(idx: *const Index) -> c_int {
     panic::catch_unwind(|| {
         if (*idx).can_flatten() { 1 } else { 0 }
     }).unwrap_or(0)
 }
 
 #[no_mangle]
-pub unsafe fn lsm_index_into_view(idx: *mut Index, err_out: *mut CError) -> *mut View {
+pub unsafe extern "C" fn lsm_index_into_view(idx: *mut Index, err_out: *mut CError) -> *mut View {
     boxed_landingpad(|| {
         Box::from_raw(idx).into_view()
     }, err_out)
