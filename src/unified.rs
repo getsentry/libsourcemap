@@ -1,7 +1,7 @@
 use std::io::{Read, Cursor};
 use std::path::Path;
 
-use sourcemap::{SourceMap, SourceMapIndex};
+use sourcemap::{SourceMap, SourceMapIndex, decode_slice, DecodedMap};
 
 use memdb::{MemDb, sourcemap_to_memdb};
 use errors::Result;
@@ -20,6 +20,11 @@ pub struct Index {
     index: SourceMapIndex,
 }
 
+pub enum ViewOrIndex {
+    View(View),
+    Index(Index),
+}
+
 #[derive(Debug)]
 pub struct TokenMatch<'a> {
     pub dst_line: u32,
@@ -29,6 +34,17 @@ pub struct TokenMatch<'a> {
     pub name: Option<&'a str>,
     pub src: &'a str,
     pub src_id: u32,
+}
+
+impl ViewOrIndex {
+    pub fn from_slice(buffer: &[u8]) -> Result<ViewOrIndex> {
+        Ok(match try!(decode_slice(buffer)) {
+            DecodedMap::Regular(sm) => ViewOrIndex::View(
+                try!(View::from_sourcemap(sm))),
+            DecodedMap::Index(smi) => ViewOrIndex::Index(
+                try!(Index::from_sourcemap_index(smi)))
+        })
+    }
 }
 
 impl View {
@@ -169,8 +185,13 @@ impl View {
 
 impl Index {
     pub fn json_from_slice(buffer: &[u8]) -> Result<Index> {
+        Index::from_sourcemap_index(
+            try!(SourceMapIndex::from_slice(&buffer)))
+    }
+
+    pub fn from_sourcemap_index(smi: SourceMapIndex) -> Result<Index> {
         Ok(Index {
-            index: try!(SourceMapIndex::from_slice(&buffer)),
+            index: smi,
         })
     }
 

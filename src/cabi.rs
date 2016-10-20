@@ -6,7 +6,7 @@ use std::os::raw::{c_int, c_uint, c_char};
 
 use sourcemap::Error as SourceMapError;
 use errors::{Error, ErrorKind, Result};
-use unified::{View, TokenMatch, Index};
+use unified::{View, TokenMatch, Index, ViewOrIndex};
 
 
 #[derive(Debug)]
@@ -58,21 +58,25 @@ unsafe fn set_token<'a>(out: *mut Token, tm: &'a TokenMatch<'a>) {
 }
 
 
-unsafe fn notify_err<T>(err: Error, err_out: *mut CError) -> *mut T {
+unsafe fn notify_err(err: Error, err_out: *mut CError) {
     if !err_out.is_null() {
         let s = format!("{}\x00", err);
         (*err_out).message = Box::into_raw(s.into_boxed_str()) as *mut u8;
         (*err_out).code = get_error_code_from_kind(err.kind());
     }
-    0 as *mut T
 }
 
-unsafe fn landingpad<F: FnOnce() -> *mut T + panic::UnwindSafe, T>(
-    f: F, err_out: *mut CError) -> *mut T
+unsafe fn landingpad<F: FnOnce() -> Result<T> + panic::UnwindSafe, T>(
+    f: F, err_out: *mut CError, err_rv: T) -> T
 {
     match panic::catch_unwind(f) {
-        Ok(rv) => rv,
-        Err(_) => notify_err(ErrorKind::InternalError.into(), err_out)
+        Ok(rv) => {
+            rv.map_err(|err| notify_err(err, err_out)).unwrap_or(err_rv)
+        }
+        Err(_) => {
+            notify_err(ErrorKind::InternalError.into(), err_out);
+            err_rv
+        }
     }
 }
 
@@ -81,9 +85,9 @@ unsafe fn boxed_landingpad<F: FnOnce() -> Result<T>, T>(
     where F: panic::UnwindSafe
 {
     landingpad(|| match f() {
-        Ok(v) => Box::into_raw(Box::new(v)),
-        Err(err) => notify_err(err, err_out)
-    }, err_out)
+        Ok(v) => Ok(Box::into_raw(Box::new(v))),
+        Err(err) => Err(err),
+    }, err_out, ptr::null_mut())
 }
 
 fn silent_panic_handler(_pi: &panic::PanicInfo) {
@@ -209,8 +213,8 @@ pub unsafe extern "C" fn lsm_view_dump_memdb(view: *mut View, len_out: *mut c_ui
     landingpad(|| {
         let memdb = (*view).dump_memdb();
         *len_out = memdb.len() as c_uint;
-        Box::into_raw(memdb.into_boxed_slice()) as *mut u8
-    }, err_out)
+        Ok(Box::into_raw(memdb.into_boxed_slice()) as *mut u8)
+    }, err_out, ptr::null_mut())
 }
 
 #[no_mangle]
@@ -249,4 +253,28 @@ pub unsafe extern "C" fn lsm_index_into_view(idx: *mut Index, err_out: *mut CErr
     boxed_landingpad(|| {
         Box::from_raw(idx).into_view()
     }, err_out)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn lsm_view_or_index_from_json(
+    bytes: *const u8, len: c_uint, err_out: *mut CError, view_out: *mut *mut View,
+    idx_out: *mut *mut Index) -> c_int
+{
+    landingpad(|| {
+        match try!(ViewOrIndex::from_slice(slice::from_raw_parts(
+            bytes,
+            len as usize
+        ))) {
+            ViewOrIndex::View(view) => {
+                *view_out = Box::into_raw(Box::new(view));
+                *idx_out = ptr::null_mut();
+                Ok(1)
+            }
+            ViewOrIndex::Index(idx) => {
+                *view_out = ptr::null_mut();
+                *idx_out = Box::into_raw(Box::new(idx));
+                Ok(2)
+            }
+        }
+    }, err_out, 0)
 }
