@@ -101,3 +101,18 @@ def test_source_iteration():
     mem_index = View.from_memdb(index.dump_memdb())
     assert list(index.iter_sources()) == [(0, u'react-dom.js')]
     assert list(mem_index.iter_sources()) == [(0, u'react-dom.js')]
+
+
+def test_source_access():
+    source, min_map = get_fixtures('react-dom-full')
+    index = View.from_json(min_map)
+    assert index.get_source_contents(0) is not None
+    assert index.has_source_contents(0)
+    assert index.get_source_contents(1) is None
+    assert not index.has_source_contents(1)
+
+    mem_index = View.from_memdb(index.dump_memdb())
+    assert mem_index.get_source_contents(0) is not None
+    assert mem_index.has_source_contents(0)
+    assert mem_index.get_source_contents(1) is None
+    assert not mem_index.has_source_contents(1)
