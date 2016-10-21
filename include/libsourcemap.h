@@ -40,6 +40,8 @@ const char *lsm_view_get_source_contents(const lsm_view_t *view,
 const char *lsm_view_get_source_name(const lsm_view_t *view,
                                      unsigned int src_id,
                                      unsigned int *len_out);
+int lsm_view_has_source_contents(const lsm_view_t *view,
+                                 unsigned int src_id);
 char *lsm_view_dump_memdb(const lsm_view_t *view,
                           unsigned int *len_out,
                           lsm_error_t *err);
