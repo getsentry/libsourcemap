@@ -158,6 +158,10 @@ class View(object):
         if rv:
             return _ffi.unpack(rv, len_out[0])
 
+    def has_source_contents(self, src_id):
+        """Checks if some sources exist."""
+        return bool(_lib.lsm_view_has_source_contents(self._get_ptr(), src_id))
+
     def get_source_name(self, src_id):
         """Returns the name of the given source."""
         len_out = _ffi.new('unsigned int *')

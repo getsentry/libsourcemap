@@ -181,6 +181,14 @@ pub unsafe extern "C" fn lsm_view_get_source_count(view: *const View) -> c_uint 
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn lsm_view_has_source_contents(view: *const View, src_id: u32) -> c_int {
+    // XXX: this silences panics
+    panic::catch_unwind(|| {
+        if (*view).get_source_contents(src_id).is_some() { 1 } else { 0 }
+    }).unwrap_or(0)
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn lsm_view_get_source_contents(view: *const View, src_id: u32, len_out: *mut u32) -> *const u8 {
     // XXX: this silences panics
     panic::catch_unwind(|| {
