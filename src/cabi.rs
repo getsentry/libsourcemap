@@ -224,10 +224,10 @@ pub unsafe extern "C" fn lsm_view_dump_memdb(view: *mut View, len_out: *mut c_ui
     -> *mut u8
 {
     landingpad(|| {
-        let memdb = (*view).dump_memdb(DumpOptions {
+        let memdb = try!((*view).dump_memdb(DumpOptions {
             with_source_contents: with_source_contents != 0,
             with_names: with_names != 0,
-        });
+        }));
         *len_out = memdb.len() as c_uint;
         Ok(Box::into_raw(memdb.into_boxed_slice()) as *mut u8)
     }, err_out, ptr::null_mut())

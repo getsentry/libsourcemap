@@ -4,7 +4,7 @@ use std::path::Path;
 use sourcemap::{SourceMap, SourceMapIndex, decode_slice, DecodedMap};
 
 use memdb::{MemDb, sourcemap_to_memdb_vec, DumpOptions};
-use errors::Result;
+use errors::{Result, ErrorKind};
 
 
 enum MapRepr {
@@ -78,10 +78,10 @@ impl View {
         })
     }
 
-    pub fn dump_memdb(&self, opts: DumpOptions) -> Vec<u8> {
+    pub fn dump_memdb(&self, opts: DumpOptions) -> Result<Vec<u8>> {
         match self.map {
-            MapRepr::Json(ref sm) => sourcemap_to_memdb_vec(sm, opts),
-            MapRepr::Mem(ref db) => db.buffer().to_vec()
+            MapRepr::Json(ref sm) => Ok(sourcemap_to_memdb_vec(sm, opts)),
+            MapRepr::Mem(_) => Err(ErrorKind::AlreadyMemDb.into()),
         }
     }
 
