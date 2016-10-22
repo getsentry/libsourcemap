@@ -58,32 +58,6 @@ pub struct Token<'a> {
 }
 
 
-fn pack_ids(src_id: u32, name_id: u32) -> Result<u32> {
-    let packed_src_id : u32 = src_id & 0x3fff;
-    let packed_name_id : u32 = name_id & 0x3ffff;
-
-    if src_id != !0 && packed_src_id >= 0x3fff {
-        return Err(ErrorKind::TooManySources.into());
-    }
-    if name_id != !0 && packed_name_id >= 0x3ffff {
-        return Err(ErrorKind::TooManyNames.into());
-    }
-
-    Ok((packed_src_id << 18) | packed_name_id)
-}
-
-fn unpack_ids(packed_ids: u32) -> (u32, u32) {
-    let mut src_id : u32 = packed_ids >> 18;
-    let mut name_id : u32 = packed_ids & 0x3ffff;
-    if src_id == 0x3fff {
-        src_id = !0;
-    }
-    if name_id == 0x3ffff {
-        name_id = !0;
-    }
-    (src_id, name_id)
-}
-
 fn verify_version<'a>(rv: MemDb<'a>) -> Result<MemDb<'a>> {
     if try!(rv.header()).version != 1 {
         Err(ErrorKind::UnsupportedMemDbVersion.into())
@@ -92,6 +66,60 @@ fn verify_version<'a>(rv: MemDb<'a>) -> Result<MemDb<'a>> {
     }
 }
 
+
+impl IndexItem {
+
+    pub fn new(raw: &RawToken) -> Result<IndexItem> {
+        let packed_src_id : u32 = raw.src_id & 0x3fff;
+        let packed_name_id : u32 = raw.name_id & 0x3ffff;
+        if raw.src_id != !0 && packed_src_id >= 0x3fff {
+            return Err(ErrorKind::TooManySources.into());
+        }
+        if raw.name_id != !0 && packed_name_id >= 0x3ffff {
+            return Err(ErrorKind::TooManyNames.into());
+        }
+
+        Ok(IndexItem {
+            dst_line: raw.dst_line,
+            dst_col: raw.dst_col,
+            src_line: raw.src_line as u16,
+            src_col: raw.src_col as u16,
+            ids: (packed_src_id << 18) | packed_name_id,
+        })
+    }
+
+    pub fn src_id(&self) -> u32 {
+        let mut src_id : u32 = self.ids >> 18;
+        if src_id == 0x3fff {
+            src_id = !0;
+        }
+        src_id
+    }
+
+    pub fn name_id(&self) -> u32 {
+        let mut name_id : u32 = self.ids & 0x3ffff;
+        if name_id == 0x3ffff {
+            name_id = !0;
+        }
+        name_id
+    }
+
+    pub fn dst_line(&self) -> u32 {
+        self.dst_line
+    }
+
+    pub fn dst_col(&self) -> u32 {
+        self.dst_col
+    }
+
+    pub fn src_line(&self) -> u32 {
+        self.src_line as u32
+    }
+
+    pub fn src_col(&self) -> u32 {
+        self.src_col as u32
+    }
+}
 
 impl<'a> MemDb<'a> {
 
@@ -146,16 +174,15 @@ impl<'a> MemDb<'a> {
     pub fn get_token(&'a self, idx: u32) -> Option<Token<'a>> {
         self.index().ok().and_then(|index| {
             (&index.get(idx as usize)).map(|ii| {
-                let (src_id, name_id) = unpack_ids(ii.ids);
                 Token {
                     db: self,
                     raw: RawToken {
-                        dst_line: ii.dst_line,
-                        dst_col: ii.dst_col,
-                        src_line: ii.src_line as u32,
-                        src_col: ii.src_col as u32,
-                        src_id: src_id,
-                        name_id: name_id,
+                        dst_line: ii.dst_line(),
+                        dst_col: ii.dst_col(),
+                        src_line: ii.src_line(),
+                        src_col: ii.src_col(),
+                        src_id: ii.src_id(),
+                        name_id: ii.name_id(),
                     }
                 }
             })
@@ -394,14 +421,7 @@ fn sourcemap_to_memdb_common<W: Write>(sm: &SourceMap, mut w: W, opts: DumpOptio
         let raw = token.get_raw_token();
         assert!(line == raw.dst_line);
         assert!(col == raw.dst_col);
-        let item = IndexItem {
-            dst_line: line,
-            dst_col: col,
-            src_line: raw.src_line as u16,
-            src_col: raw.src_col as u16,
-            ids: try!(pack_ids(raw.src_id, raw.name_id))
-        };
-        idx += try!(write_obj(&mut w, &item));
+        idx += try!(write_obj(&mut w, &try!(IndexItem::new(&raw))));
     }
 
     // write names
