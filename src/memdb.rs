@@ -200,7 +200,7 @@ impl<'a> MemDb<'a> {
         while low < high {
             let mid = (low + high) / 2;
             let ii = &index[mid as usize];
-            if (line, col) < (ii.dst_line, ii.dst_col) {
+            if (line, col) < (ii.dst_line(), ii.dst_col()) {
                 high = mid;
             } else {
                 low = mid + 1;
