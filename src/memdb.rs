@@ -128,9 +128,9 @@ impl<'a> MemDb<'a> {
         self.source_contents().ok().and_then(|x| {
             self.get_bytes(x, src_id)
         }).and_then(|bytes| {
-            let mut decompressor = BrotliDecoder::new(bytes);
+            let mut decompr = BrotliDecoder::new(bytes);
             let mut contents = String::new();
-            decompressor.read_to_string(&mut contents).ok();
+            decompr.read_to_string(&mut contents).ok();
             Some(contents)
         })
     }
