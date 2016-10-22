@@ -116,3 +116,24 @@ def test_source_access():
     assert mem_index.has_source_contents(0)
     assert mem_index.get_source_contents(1) is None
     assert not mem_index.has_source_contents(1)
+
+
+def test_memdb_dumping():
+    source, min_map = get_fixtures('react-dom-full')
+    index = View.from_json(min_map)
+    full_mem_index = View.from_memdb(index.dump_memdb())
+    nosource_mem_index = View.from_memdb(index.dump_memdb(
+        with_source_contents=False))
+    nonames_mem_index = View.from_memdb(index.dump_memdb(
+        with_names=False))
+
+    for t1, t2, t3 in zip(full_mem_index, nosource_mem_index, nonames_mem_index):
+        if t1.name is None:
+            continue
+        assert t1.name == t2.name
+        assert t3.name is None
+
+    assert full_mem_index.get_source_contents(0) is not None
+    assert full_mem_index.get_source_contents(0) == \
+        nonames_mem_index.get_source_contents(0)
+    assert nosource_mem_index.get_source_contents(0) is None
