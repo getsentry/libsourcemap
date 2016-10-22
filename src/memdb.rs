@@ -5,11 +5,12 @@ use std::slice;
 use std::io;
 use std::path::Path;
 use std::ptr::copy_nonoverlapping;
-use std::io::{Write, Seek, SeekFrom};
+use std::io::{Read, Write, Seek, SeekFrom};
 use std::borrow::Cow;
 use memmap::{Mmap, Protection};
 
 use sourcemap::{RawToken, SourceMap};
+use brotli2::read::{BrotliEncoder, BrotliDecoder};
 
 use errors::{ErrorKind, Result};
 
@@ -123,8 +124,15 @@ impl<'a> MemDb<'a> {
         self.sources().ok().and_then(|x| self.get_string(x, src_id))
     }
 
-    pub fn get_source_contents(&self, src_id: u32) -> Option<&str> {
-        self.source_contents().ok().and_then(|x| self.get_string(x, src_id))
+    pub fn get_source_contents(&'a self, src_id: u32) -> Option<String> {
+        self.source_contents().ok().and_then(|x| {
+            self.get_bytes(x, src_id)
+        }).and_then(|bytes| {
+            let mut decompressor = BrotliDecoder::new(bytes);
+            let mut contents = String::new();
+            decompressor.read_to_string(&mut contents).ok();
+            Some(contents)
+        })
     }
 
     pub fn get_token_count(&self) -> u32 {
@@ -207,15 +215,19 @@ impl<'a> MemDb<'a> {
         })
     }
 
-    fn get_string(&self, coll: &[u32], idx: u32) -> Option<&str> {
+    fn get_bytes(&self, coll: &[u32], idx: u32) -> Option<&[u8]> {
         coll.get(idx as usize).and_then(|offset| {
             let offset = *offset as usize;
             let buffer = self.buffer();
             let len = unsafe {
                 *(buffer[offset..offset + 4].as_ptr() as *const u32)
             } as usize;
-            from_utf8(&buffer[offset + 4..offset + 4 + len]).ok()
+            Some(&buffer[offset + 4..offset + 4 + len])
         })
+    }
+
+    fn get_string(&self, coll: &[u32], idx: u32) -> Option<&str> {
+        self.get_bytes(coll, idx).and_then(|bytes| from_utf8(bytes).ok())
     }
 
     #[inline(always)]
@@ -423,7 +435,10 @@ fn sourcemap_to_memdb_common<W: Write>(sm: &SourceMap, mut w: W, opts: DumpOptio
             if let Some(contents) = sm.get_source_contents(source_id) {
                 have_sources = true;
                 source_contents.push(idx);
-                idx += try!(write_str(&mut w, contents.as_bytes()));
+                let mut compressed = vec![];
+                let mut compr = BrotliEncoder::new(contents.as_bytes(), 0);
+                try!(compr.read_to_end(&mut compressed));
+                idx += try!(write_str(&mut w, &compressed[..]));
             } else {
                 source_contents.push(!0);
             }

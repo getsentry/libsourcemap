@@ -190,17 +190,20 @@ pub unsafe extern "C" fn lsm_view_has_source_contents(view: *const View, src_id:
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn lsm_view_get_source_contents(view: *const View, src_id: u32, len_out: *mut u32) -> *const u8 {
+pub unsafe extern "C" fn lsm_view_get_source_contents(
+    view: *const View, src_id: u32, len_out: *mut u32)
+-> *const u8
+{
     // XXX: this silences panics
     panic::catch_unwind(|| {
         match (*view).get_source_contents(src_id) {
-            None => ptr::null(),
+            None => ptr::null_mut(),
             Some(contents) => {
                 *len_out = contents.len() as u32;
-                contents.as_ptr()
+                Box::into_raw(contents.into_boxed_str()) as *mut u8
             }
         }
-    }).unwrap_or(ptr::null())
+    }).unwrap_or(ptr::null_mut())
 }
 
 #[no_mangle]

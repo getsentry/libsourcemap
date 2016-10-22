@@ -117,9 +117,9 @@ impl View {
         None
     }
 
-    pub fn get_source_contents(&self, src_id: u32) -> Option<&str> {
+    pub fn get_source_contents(&self, src_id: u32) -> Option<String> {
         match self.map {
-            MapRepr::Json(ref sm) => sm.get_source_contents(src_id),
+            MapRepr::Json(ref sm) => sm.get_source_contents(src_id).map(|x| x.to_string()),
             MapRepr::Mem(ref db) => db.get_source_contents(src_id),
         }
     }
