@@ -37,6 +37,11 @@ pub struct MapHead {
     pub source_contents_count: u32,
 }
 
+pub struct DumpOptions {
+    pub with_source_contents: bool,
+    pub with_names: bool,
+}
+
 enum Backing<'a> {
     Buf(Cow<'a, [u8]>),
     Mmap(Mmap),
@@ -362,7 +367,9 @@ fn write_slice<T, W: Write>(w: &mut W, x: &[T]) -> io::Result<u32> {
     }
 }
 
-fn sourcemap_to_memdb_common<W: Write>(sm: &SourceMap, mut w: W) -> Result<(W, MapHead)> {
+fn sourcemap_to_memdb_common<W: Write>(sm: &SourceMap, mut w: W, opts: DumpOptions)
+    -> Result<(W, MapHead)>
+{
     let mut head = MapHead {
         version: 1,
         index_size: sm.get_index_size() as u32,
@@ -394,27 +401,40 @@ fn sourcemap_to_memdb_common<W: Write>(sm: &SourceMap, mut w: W) -> Result<(W, M
     }
 
     // write names
-    let mut names = Vec::with_capacity(sm.get_name_count() as usize);
-    for name in sm.names() {
-        names.push(idx);
-        idx += try!(write_cstr(&mut w, name.as_bytes()));
-    }
+    let names = {
+        if opts.with_names {
+            let mut names = Vec::with_capacity(sm.get_name_count() as usize);
+            for name in sm.names() {
+                names.push(idx);
+                idx += try!(write_cstr(&mut w, name.as_bytes()));
+            }
+            names
+        } else {
+            vec![]
+        }
+    };
 
     // write sources
     let mut sources = Vec::with_capacity(sm.get_source_count() as usize);
-    let mut source_contents = Vec::with_capacity(sm.get_source_count() as usize);
+    let mut source_contents = if opts.with_source_contents {
+        Vec::with_capacity(sm.get_source_count() as usize)
+    } else {
+        vec![]
+    };
     let mut have_sources = false;
     for source_id in 0..sm.get_source_count() {
         let source = sm.get_source(source_id).unwrap();
         sources.push(idx);
         idx += try!(write_cstr(&mut w, source.as_bytes()));
 
-        if let Some(contents) = sm.get_source_contents(source_id) {
-            have_sources = true;
-            source_contents.push(idx);
-            idx += try!(write_cstr(&mut w, contents.as_bytes()));
-        } else {
-            source_contents.push(!0);
+        if opts.with_source_contents {
+            if let Some(contents) = sm.get_source_contents(source_id) {
+                have_sources = true;
+                source_contents.push(idx);
+                idx += try!(write_cstr(&mut w, contents.as_bytes()));
+            } else {
+                source_contents.push(!0);
+            }
         }
     }
 
@@ -434,9 +454,9 @@ fn sourcemap_to_memdb_common<W: Write>(sm: &SourceMap, mut w: W) -> Result<(W, M
 }
 
 /// Serializes a map into a vec
-pub fn sourcemap_to_memdb_vec(sm: &SourceMap) -> Vec<u8> {
+pub fn sourcemap_to_memdb_vec(sm: &SourceMap, opts: DumpOptions) -> Vec<u8> {
     let mut rv = vec![];
-    let (_, head) = sourcemap_to_memdb_common(sm, &mut rv).unwrap();
+    let (_, head) = sourcemap_to_memdb_common(sm, &mut rv, opts).unwrap();
 
     unsafe {
         let byte_head : *const u8 = mem::transmute(&head);
@@ -448,8 +468,10 @@ pub fn sourcemap_to_memdb_vec(sm: &SourceMap) -> Vec<u8> {
 }
 
 /// Serializes a map into a given writer
-pub fn sourcemap_to_memdb<W: Write+Seek>(sm: &SourceMap, w: W) -> Result<()> {
-    let (mut w, head) = try!(sourcemap_to_memdb_common(sm, w));
+pub fn sourcemap_to_memdb<W: Write+Seek>(sm: &SourceMap, w: W, opts: DumpOptions)
+    -> Result<()>
+{
+    let (mut w, head) = try!(sourcemap_to_memdb_common(sm, w, opts));
 
     // write offsets
     try!(w.seek(SeekFrom::Start(0)));

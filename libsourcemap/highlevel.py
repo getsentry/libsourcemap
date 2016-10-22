@@ -126,12 +126,14 @@ class View(object):
             raise RuntimeError('View is closed')
         return self._ptr
 
-    def dump_memdb(self):
+    def dump_memdb(self, with_source_contents=True, with_names=True):
         """Dumps a sourcemap in MemDB format into bytes."""
         len_out = _ffi.new('unsigned int *')
         with capture_err() as (err_out, check):
             buf = check(_lib.lsm_view_dump_memdb(
-                self._get_ptr(), len_out, err_out))
+                self._get_ptr(), len_out,
+                with_source_contents, with_names,
+                err_out))
         try:
             rv = _ffi.unpack(buf, len_out[0])
         finally:

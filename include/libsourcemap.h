@@ -44,6 +44,8 @@ int lsm_view_has_source_contents(const lsm_view_t *view,
                                  unsigned int src_id);
 char *lsm_view_dump_memdb(const lsm_view_t *view,
                           unsigned int *len_out,
+                          int with_source_contents,
+                          int with_names,
                           lsm_error_t *err);
 
 lsm_index_t *lsm_index_from_json(char *bytes, unsigned int len, lsm_error_t *err);

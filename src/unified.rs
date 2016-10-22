@@ -3,7 +3,7 @@ use std::path::Path;
 
 use sourcemap::{SourceMap, SourceMapIndex, decode_slice, DecodedMap};
 
-use memdb::{MemDb, sourcemap_to_memdb_vec};
+use memdb::{MemDb, sourcemap_to_memdb_vec, DumpOptions};
 use errors::Result;
 
 
@@ -78,9 +78,9 @@ impl View {
         })
     }
 
-    pub fn dump_memdb(&self) -> Vec<u8> {
+    pub fn dump_memdb(&self, opts: DumpOptions) -> Vec<u8> {
         match self.map {
-            MapRepr::Json(ref sm) => sourcemap_to_memdb_vec(sm),
+            MapRepr::Json(ref sm) => sourcemap_to_memdb_vec(sm, opts),
             MapRepr::Mem(ref db) => db.buffer().to_vec()
         }
     }

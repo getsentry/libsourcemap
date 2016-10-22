@@ -7,6 +7,7 @@ use std::os::raw::{c_int, c_uint, c_char};
 use sourcemap::Error as SourceMapError;
 use errors::{Error, ErrorKind, Result};
 use unified::{View, TokenMatch, Index, ViewOrIndex};
+use memdb::DumpOptions;
 
 
 #[derive(Debug)]
@@ -217,9 +218,16 @@ pub unsafe extern "C" fn lsm_view_get_source_name(view: *const View, src_id: u32
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn lsm_view_dump_memdb(view: *mut View, len_out: *mut c_uint, err_out: *mut CError) -> *mut u8 {
+pub unsafe extern "C" fn lsm_view_dump_memdb(view: *mut View, len_out: *mut c_uint,
+                                             with_source_contents: c_int,
+                                             with_names: c_int, err_out: *mut CError)
+    -> *mut u8
+{
     landingpad(|| {
-        let memdb = (*view).dump_memdb();
+        let memdb = (*view).dump_memdb(DumpOptions {
+            with_source_contents: with_source_contents != 0,
+            with_names: with_names != 0,
+        });
         *len_out = memdb.len() as c_uint;
         Ok(Box::into_raw(memdb.into_boxed_slice()) as *mut u8)
     }, err_out, ptr::null_mut())

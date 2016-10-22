@@ -27,5 +27,8 @@ error_chain! {
         TooManyNames {
             description("Too many names in the file for memdb")
         }
+        AlreadyMemDb {
+            description("Cannot dump memdb from memdb view")
+        }
     }
 }

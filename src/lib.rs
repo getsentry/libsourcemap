@@ -10,7 +10,7 @@ mod errors;
 pub mod memdb;
 
 pub use errors::{Error, ErrorKind, ChainErr, Result};
-pub use unified::{View, TokenMatch};
+pub use unified::{View, Index, TokenMatch};
 
 // unified interface
 mod unified;
