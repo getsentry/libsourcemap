@@ -3,6 +3,7 @@
 extern crate sourcemap;
 extern crate memmap;
 extern crate brotli2;
+extern crate varinteger;
 
 #[macro_use]
 extern crate error_chain;

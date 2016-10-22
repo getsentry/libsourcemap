@@ -9,6 +9,7 @@ use std::io::{Read, Write, Seek, SeekFrom};
 use std::borrow::Cow;
 use memmap::{Mmap, Protection};
 
+use varinteger;
 use sourcemap::{RawToken, SourceMap};
 use brotli2::read::{BrotliEncoder, BrotliDecoder};
 
@@ -244,12 +245,11 @@ impl<'a> MemDb<'a> {
 
     fn get_bytes(&self, coll: &[u32], idx: u32) -> Option<&[u8]> {
         coll.get(idx as usize).and_then(|offset| {
-            let offset = *offset as usize;
+            let mut offset = *offset as usize;
             let buffer = self.buffer();
-            let len = unsafe {
-                *(buffer[offset..offset + 4].as_ptr() as *const u32)
-            } as usize;
-            Some(&buffer[offset + 4..offset + 4 + len])
+            let mut len = 0u64;
+            offset += varinteger::decode_with_offset(buffer, offset, &mut len) as usize;
+            Some(&buffer[offset..offset + len as usize])
         })
     }
 
@@ -384,9 +384,11 @@ fn write_obj<T, W: Write>(w: &mut W, x: &T) -> io::Result<u32> {
 }
 
 fn write_str<W: Write>(w: &mut W, bytes: &[u8]) -> io::Result<u32> {
-    try!(write_obj(w, &(bytes.len() as u32)));
+    let mut buf = [0u8; 8];
+    let off = varinteger::encode(bytes.len() as u64, &mut buf);
+    try!(w.write_all(&buf[..off]));
     try!(w.write_all(bytes));
-    Ok(bytes.len() as u32 + 4)
+    Ok(bytes.len() as u32 + off as u32)
 }
 
 fn write_slice<T, W: Write>(w: &mut W, x: &[T]) -> io::Result<u32> {
