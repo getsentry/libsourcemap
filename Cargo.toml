@@ -11,3 +11,4 @@ crate-type = ["cdylib", "rlib"]
 sourcemap = "0.7.1"
 error-chain = "0.5.0"
 memmap = "0.4.0"
+brotli2 = "0.2.1"

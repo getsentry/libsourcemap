@@ -211,16 +211,10 @@ impl<'a> MemDb<'a> {
         coll.get(idx as usize).and_then(|offset| {
             let offset = *offset as usize;
             let buffer = self.buffer();
-            let mut len = 0;
-            loop {
-                if offset + len >= buffer.len() {
-                    return None;
-                } else if buffer[offset + len] == b'\x00' {
-                    break;
-                }
-                len += 1;
-            }
-            from_utf8(&buffer[offset..offset + len]).ok()
+            let len = unsafe {
+                *(buffer[offset..offset + 4].as_ptr() as *const u32)
+            } as usize;
+            from_utf8(&buffer[offset + 4..offset + 4 + len]).ok()
         })
     }
 
@@ -350,12 +344,10 @@ fn write_obj<T, W: Write>(w: &mut W, x: &T) -> io::Result<u32> {
     }
 }
 
-fn write_cstr<W: Write>(w: &mut W, bytes: &[u8]) -> io::Result<u32> {
-    // XXX: strip out contained null bytes? does not seem to cause a security
-    // problem here so maybe we can live with not doing that for now.
+fn write_str<W: Write>(w: &mut W, bytes: &[u8]) -> io::Result<u32> {
+    try!(write_obj(w, &(bytes.len() as u32)));
     try!(w.write_all(bytes));
-    try!(w.write_all(b"\x00"));
-    Ok(bytes.len() as u32 + 1)
+    Ok(bytes.len() as u32 + 4)
 }
 
 fn write_slice<T, W: Write>(w: &mut W, x: &[T]) -> io::Result<u32> {
@@ -406,7 +398,7 @@ fn sourcemap_to_memdb_common<W: Write>(sm: &SourceMap, mut w: W, opts: DumpOptio
             let mut names = Vec::with_capacity(sm.get_name_count() as usize);
             for name in sm.names() {
                 names.push(idx);
-                idx += try!(write_cstr(&mut w, name.as_bytes()));
+                idx += try!(write_str(&mut w, name.as_bytes()));
             }
             names
         } else {
@@ -425,13 +417,13 @@ fn sourcemap_to_memdb_common<W: Write>(sm: &SourceMap, mut w: W, opts: DumpOptio
     for source_id in 0..sm.get_source_count() {
         let source = sm.get_source(source_id).unwrap();
         sources.push(idx);
-        idx += try!(write_cstr(&mut w, source.as_bytes()));
+        idx += try!(write_str(&mut w, source.as_bytes()));
 
         if opts.with_source_contents {
             if let Some(contents) = sm.get_source_contents(source_id) {
                 have_sources = true;
                 source_contents.push(idx);
-                idx += try!(write_cstr(&mut w, contents.as_bytes()));
+                idx += try!(write_str(&mut w, contents.as_bytes()));
             } else {
                 source_contents.push(!0);
             }
