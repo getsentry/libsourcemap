@@ -4,6 +4,7 @@ use std::fmt;
 use std::slice;
 use std::io;
 use std::path::Path;
+use std::ptr::copy_nonoverlapping;
 use std::io::{Write, Seek, SeekFrom};
 use std::borrow::Cow;
 use memmap::{Mmap, Protection};
@@ -361,8 +362,7 @@ fn write_slice<T, W: Write>(w: &mut W, x: &[T]) -> io::Result<u32> {
     }
 }
 
-/// Serializes a map into a given writer
-pub fn sourcemap_to_memdb<W: Write+Seek>(sm: &SourceMap, mut w: W) -> Result<()> {
+fn sourcemap_to_memdb_common<W: Write>(sm: &SourceMap, mut w: W) -> Result<(W, MapHead)> {
     let mut head = MapHead {
         version: 1,
         index_size: sm.get_index_size() as u32,
@@ -394,15 +394,15 @@ pub fn sourcemap_to_memdb<W: Write+Seek>(sm: &SourceMap, mut w: W) -> Result<()>
     }
 
     // write names
-    let mut names = vec![];
+    let mut names = Vec::with_capacity(sm.get_name_count() as usize);
     for name in sm.names() {
         names.push(idx);
         idx += try!(write_cstr(&mut w, name.as_bytes()));
     }
 
     // write sources
-    let mut sources = vec![];
-    let mut source_contents = vec![];
+    let mut sources = Vec::with_capacity(sm.get_source_count() as usize);
+    let mut source_contents = Vec::with_capacity(sm.get_source_count() as usize);
     let mut have_sources = false;
     for source_id in 0..sm.get_source_count() {
         let source = sm.get_source(source_id).unwrap();
@@ -429,6 +429,27 @@ pub fn sourcemap_to_memdb<W: Write+Seek>(sm: &SourceMap, mut w: W) -> Result<()>
         head.source_contents_count = source_contents.len() as u32;
         try!(write_slice(&mut w, &source_contents));
     }
+
+    Ok((w, head))
+}
+
+/// Serializes a map into a vec
+pub fn sourcemap_to_memdb_vec(sm: &SourceMap) -> Vec<u8> {
+    let mut rv = vec![];
+    let (_, head) = sourcemap_to_memdb_common(sm, &mut rv).unwrap();
+
+    unsafe {
+        let byte_head : *const u8 = mem::transmute(&head);
+        copy_nonoverlapping(byte_head, rv.as_mut_ptr(),
+                            mem::size_of_val(&head));
+    }
+
+    rv
+}
+
+/// Serializes a map into a given writer
+pub fn sourcemap_to_memdb<W: Write+Seek>(sm: &SourceMap, w: W) -> Result<()> {
+    let (mut w, head) = try!(sourcemap_to_memdb_common(sm, w));
 
     // write offsets
     try!(w.seek(SeekFrom::Start(0)));

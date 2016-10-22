@@ -1,9 +1,9 @@
-use std::io::{Read, Cursor};
+use std::io::Read;
 use std::path::Path;
 
 use sourcemap::{SourceMap, SourceMapIndex, decode_slice, DecodedMap};
 
-use memdb::{MemDb, sourcemap_to_memdb};
+use memdb::{MemDb, sourcemap_to_memdb_vec};
 use errors::Result;
 
 
@@ -80,12 +80,7 @@ impl View {
 
     pub fn dump_memdb(&self) -> Vec<u8> {
         match self.map {
-            MapRepr::Json(ref sm) => {
-                let mut rv = Cursor::new(vec![]);
-                // this should not fail if we write to memory
-                sourcemap_to_memdb(sm, &mut rv).unwrap();
-                rv.into_inner()
-            },
+            MapRepr::Json(ref sm) => sourcemap_to_memdb_vec(sm),
             MapRepr::Mem(ref db) => db.buffer().to_vec()
         }
     }
