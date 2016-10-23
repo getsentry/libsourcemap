@@ -1,5 +1,6 @@
 use std::io::Read;
 use std::path::Path;
+use std::borrow::Cow;
 
 use sourcemap::{SourceMap, SourceMapIndex, decode_slice, DecodedMap};
 
@@ -117,10 +118,14 @@ impl View {
         None
     }
 
-    pub fn get_source_contents(&self, src_id: u32) -> Option<String> {
+    pub fn get_source_contents<'a>(&'a self, src_id: u32) -> Option<Cow<'a, str>> {
         match self.map {
-            MapRepr::Json(ref sm) => sm.get_source_contents(src_id).map(|x| x.to_string()),
-            MapRepr::Mem(ref db) => db.get_source_contents(src_id),
+            MapRepr::Json(ref sm) => {
+                sm.get_source_contents(src_id).map(|x| Cow::Borrowed(x))
+            },
+            MapRepr::Mem(ref db) => {
+                db.get_source_contents(src_id).map(|x| Cow::Owned(x))
+            }
         }
     }
 

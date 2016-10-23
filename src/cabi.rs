@@ -2,6 +2,7 @@ use std::ptr;
 use std::slice;
 use std::panic;
 use std::ffi::CStr;
+use std::borrow::Cow;
 use std::os::raw::{c_int, c_uint, c_char};
 
 use sourcemap::Error as SourceMapError;
@@ -201,25 +202,34 @@ pub unsafe extern "C" fn lsm_view_get_source_count(
 
 #[no_mangle]
 pub unsafe extern "C" fn lsm_view_has_source_contents(
-    view: *const View, src_id: u32) -> c_int
+    view: *const View, src_id: c_uint) -> c_int
 {
     // XXX: this silences panics
     panic::catch_unwind(|| {
-        if (*view).get_source_contents(src_id).is_some() { 1 } else { 0 }
+        if (*view).get_source_contents(src_id as u32).is_some() { 1 } else { 0 }
     }).unwrap_or(0)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn lsm_view_get_source_contents(
-    view: *const View, src_id: u32, len_out: *mut u32) -> *const u8
+    view: *const View, src_id: c_uint, len_out: *mut c_uint,
+    must_free: *mut c_int) -> *const u8
 {
+    *must_free = 0;
+
     // XXX: this silences panics
     panic::catch_unwind(|| {
-        match (*view).get_source_contents(src_id) {
+        match (*view).get_source_contents(src_id as u32) {
             None => ptr::null_mut(),
             Some(contents) => {
-                *len_out = contents.len() as u32;
-                Box::into_raw(contents.into_boxed_str()) as *mut u8
+                *len_out = contents.len() as c_uint;
+                match contents {
+                    Cow::Borrowed(s) => s.as_ptr() as *mut u8,
+                    Cow::Owned(val) => {
+                        *must_free = 1;
+                        Box::into_raw(val.into_boxed_str()) as *mut u8
+                    }
+                }
             }
         }
     }).unwrap_or(ptr::null_mut())
@@ -227,14 +237,14 @@ pub unsafe extern "C" fn lsm_view_get_source_contents(
 
 #[no_mangle]
 pub unsafe extern "C" fn lsm_view_get_source_name(
-    view: *const View, src_id: u32, len_out: *mut u32) -> *const u8
+    view: *const View, src_id: c_uint, len_out: *mut c_uint) -> *const u8
 {
     // XXX: this silences panics
     panic::catch_unwind(|| {
-        match (*view).get_source(src_id) {
+        match (*view).get_source(src_id as u32) {
             None => ptr::null(),
             Some(name) => {
-                *len_out = name.len() as u32;
+                *len_out = name.len() as c_uint;
                 name.as_ptr()
             }
         }
@@ -300,8 +310,8 @@ pub unsafe extern "C" fn lsm_index_into_view(
 
 #[no_mangle]
 pub unsafe extern "C" fn lsm_view_or_index_from_json(
-    bytes: *const u8, len: c_uint, err_out: *mut CError, view_out: *mut *mut View,
-    idx_out: *mut *mut Index) -> c_int
+    bytes: *const u8, len: c_uint, err_out: *mut CError,
+    view_out: *mut *mut View, idx_out: *mut *mut Index) -> c_int
 {
     landingpad(|| {
         match try!(ViewOrIndex::from_slice(slice::from_raw_parts(

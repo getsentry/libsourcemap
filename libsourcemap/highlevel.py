@@ -156,12 +156,15 @@ class View(object):
         The sourcecode is returned as UTF-8 bytes for more efficient processing.
         """
         len_out = _ffi.new('unsigned int *')
-        rv = _lib.lsm_view_get_source_contents(self._get_ptr(), src_id, len_out)
+        must_free = _ffi.new('int *')
+        rv = _lib.lsm_view_get_source_contents(self._get_ptr(), src_id,
+                                               len_out, must_free)
         if rv:
             try:
                 return _ffi.unpack(rv, len_out[0])
             finally:
-                _lib.lsm_buffer_free(rv)
+                if must_free[0]:
+                    _lib.lsm_buffer_free(rv)
 
     def has_source_contents(self, src_id):
         """Checks if some sources exist."""
