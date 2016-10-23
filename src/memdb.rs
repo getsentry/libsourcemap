@@ -64,7 +64,7 @@ fn verify_version<'a>(rv: MemDb<'a>) -> Result<MemDb<'a>> {
     }
 }
 
-fn pack_line_shape(line: u32, col: u32) -> Result<(u8, u32)> {
+fn pack_loc_shape(line: u32, col: u32) -> Result<(u8, u32)> {
     fn mask(x: u32, m: u32) -> Result<u32> {
         let p = x & m;
         if p != x {
@@ -81,7 +81,7 @@ fn pack_line_shape(line: u32, col: u32) -> Result<(u8, u32)> {
     })
 }
 
-fn unpack_line_shape(shape: u8, packed: u32) -> (u32, u32) {
+fn unpack_loc_shape(shape: u8, packed: u32) -> (u32, u32) {
     if shape == 1 {
         (packed >> 14, packed & 0x3fff)
     } else {
@@ -102,8 +102,8 @@ impl IndexItem {
             return Err(ErrorKind::TooManyNames.into());
         }
 
-        let (shape_dst, packed_dst) = try!(pack_line_shape(raw.dst_line, raw.dst_col));
-        let (shape_src, packed_src) = try!(pack_line_shape(raw.src_line, raw.src_col));
+        let (shape_dst, packed_dst) = try!(pack_loc_shape(raw.dst_line, raw.dst_col));
+        let (shape_src, packed_src) = try!(pack_loc_shape(raw.src_line, raw.src_col));
 
         Ok(IndexItem {
             packed_locinfo: (
@@ -133,23 +133,23 @@ impl IndexItem {
     }
 
     pub fn dst_line(&self) -> u32 {
-        unpack_line_shape(((self.packed_locinfo >> 63) & 0x1) as u8,
-                          ((self.packed_locinfo >> 31) & 0x7fffffff) as u32).0
+        unpack_loc_shape(((self.packed_locinfo >> 63) & 0x1) as u8,
+                         ((self.packed_locinfo >> 31) & 0x7fffffff) as u32).0
     }
 
     pub fn dst_col(&self) -> u32 {
-        unpack_line_shape(((self.packed_locinfo >> 63) & 0x1) as u8,
-                          ((self.packed_locinfo >> 31) & 0x7fffffff) as u32).1
+        unpack_loc_shape(((self.packed_locinfo >> 63) & 0x1) as u8,
+                         ((self.packed_locinfo >> 31) & 0x7fffffff) as u32).1
     }
 
     pub fn src_line(&self) -> u32 {
-        unpack_line_shape(((self.packed_locinfo >> 62) & 0x1) as u8,
-                          ((self.packed_locinfo >> 0) & 0x7fffffff) as u32).0
+        unpack_loc_shape(((self.packed_locinfo >> 62) & 0x1) as u8,
+                         ((self.packed_locinfo >> 0) & 0x7fffffff) as u32).0
     }
 
     pub fn src_col(&self) -> u32 {
-        unpack_line_shape(((self.packed_locinfo >> 62) & 0x1) as u8,
-                          ((self.packed_locinfo >> 0) & 0x7fffffff) as u32).1
+        unpack_loc_shape(((self.packed_locinfo >> 62) & 0x1) as u8,
+                         ((self.packed_locinfo >> 0) & 0x7fffffff) as u32).1
     }
 }
 
