@@ -19,10 +19,7 @@ use errors::{ErrorKind, Result};
 #[derive(Debug, Copy, Clone)]
 #[repr(C, packed)]
 pub struct IndexItem {
-    pub dst_line: u32,
-    pub dst_col: u32,
-    pub src_line: u16,
-    pub src_col: u16,
+    pub packed_locinfo: u64,
     pub ids: u32,
 }
 
@@ -67,6 +64,31 @@ fn verify_version<'a>(rv: MemDb<'a>) -> Result<MemDb<'a>> {
     }
 }
 
+fn pack_line_shape(line: u32, col: u32) -> Result<(u8, u32)> {
+    fn mask(x: u32, m: u32) -> Result<u32> {
+        let p = x & m;
+        if p != x {
+            Err(ErrorKind::LocationOverflow.into())
+        } else {
+            Ok(p)
+        }
+    }
+
+    Ok(if line > col {
+        (1, (try!(mask(line, 0x1ffff)) << 14) | try!(mask(col, 0x3fff)))
+    } else {
+        (0, (try!(mask(line, 0x3fff)) << 17) | try!(mask(col, 0x1ffff)))
+    })
+}
+
+fn unpack_line_shape(shape: u8, packed: u32) -> (u32, u32) {
+    if shape == 1 {
+        (packed >> 14, packed & 0x3fff)
+    } else {
+        (packed >> 17, packed & 0x1ffff)
+    }
+}
+
 
 impl IndexItem {
 
@@ -80,11 +102,16 @@ impl IndexItem {
             return Err(ErrorKind::TooManyNames.into());
         }
 
+        let (shape_dst, packed_dst) = try!(pack_line_shape(raw.dst_line, raw.dst_col));
+        let (shape_src, packed_src) = try!(pack_line_shape(raw.src_line, raw.src_col));
+
         Ok(IndexItem {
-            dst_line: raw.dst_line,
-            dst_col: raw.dst_col,
-            src_line: raw.src_line as u16,
-            src_col: raw.src_col as u16,
+            packed_locinfo: (
+                ((shape_dst as u64) << 63) |
+                ((shape_src as u64) << 62) |
+                ((packed_dst as u64) << 31) |
+                (packed_src as u64)
+            ),
             ids: (packed_src_id << 18) | packed_name_id,
         })
     }
@@ -106,19 +133,23 @@ impl IndexItem {
     }
 
     pub fn dst_line(&self) -> u32 {
-        self.dst_line
+        unpack_line_shape(((self.packed_locinfo >> 63) & 0x1) as u8,
+                          ((self.packed_locinfo >> 31) & 0x7fffffff) as u32).0
     }
 
     pub fn dst_col(&self) -> u32 {
-        self.dst_col
+        unpack_line_shape(((self.packed_locinfo >> 63) & 0x1) as u8,
+                          ((self.packed_locinfo >> 31) & 0x7fffffff) as u32).1
     }
 
     pub fn src_line(&self) -> u32 {
-        self.src_line as u32
+        unpack_line_shape(((self.packed_locinfo >> 62) & 0x1) as u8,
+                          ((self.packed_locinfo >> 0) & 0x7fffffff) as u32).0
     }
 
     pub fn src_col(&self) -> u32 {
-        self.src_col as u32
+        unpack_line_shape(((self.packed_locinfo >> 62) & 0x1) as u8,
+                          ((self.packed_locinfo >> 0) & 0x7fffffff) as u32).1
     }
 }
 
