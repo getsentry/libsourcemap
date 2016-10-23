@@ -36,10 +36,35 @@ class BadIo(SourceMapError):
     """Raised if an IO error happened."""
 
 
+class MemDbDumpError(SourceMapError):
+    """Raised if creating a memdb is not possible."""
+
+
+class TooManySources(MemDbDumpError):
+    """There are too many sources for memdb."""
+
+
+class TooManyNames(MemDbDumpError):
+    """There are too many names for memdb."""
+
+
+class LocationOverflow(MemDbDumpError):
+    """The location information is too large for the memdb format."""
+
+
+class AlreadyMemDb(MemDbDumpError):
+    """Cannot create a memdb from a memdb."""
+
+
 special_errors = {
     2: IndexedSourceMap,
     3: BadJson,
     4: CannotFlatten,
     5: UnsupportedMemDbVersion,
     6: BadIo,
+
+    20: TooManySources,
+    21: TooManyNames,
+    22: LocationOverflow,
+    23: AlreadyMemDb,
 }

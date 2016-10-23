@@ -39,6 +39,10 @@ fn get_error_code_from_kind(kind: &ErrorKind) -> c_int {
         ErrorKind::SourceMapError(SourceMapError::CannotFlatten(_)) => 4,
         ErrorKind::UnsupportedMemDbVersion => 5,
         ErrorKind::IoError(_) => 6,
+        ErrorKind::TooManySources => 20,
+        ErrorKind::TooManyNames => 21,
+        ErrorKind::LocationOverflow => 22,
+        ErrorKind::AlreadyMemDb => 23,
         _ => 1,
     }
 }
