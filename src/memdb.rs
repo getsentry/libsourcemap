@@ -93,26 +93,26 @@ fn unpack_loc_shape(shape: u8, packed: u32) -> (u32, u32) {
 impl IndexItem {
 
     pub fn new(raw: &RawToken) -> Result<IndexItem> {
-        let packed_src_id : u32 = raw.src_id & 0x3fff;
-        let packed_name_id : u32 = raw.name_id & 0x3ffff;
-        if raw.src_id != !0 && packed_src_id >= 0x3fff {
+        let psrc_id : u32 = raw.src_id & 0x3fff;
+        let pname_id : u32 = raw.name_id & 0x3ffff;
+        if raw.src_id != !0 && psrc_id >= 0x3fff {
             return Err(ErrorKind::TooManySources.into());
         }
-        if raw.name_id != !0 && packed_name_id >= 0x3ffff {
+        if raw.name_id != !0 && pname_id >= 0x3ffff {
             return Err(ErrorKind::TooManyNames.into());
         }
 
-        let (shape_dst, packed_dst) = try!(pack_loc_shape(raw.dst_line, raw.dst_col));
-        let (shape_src, packed_src) = try!(pack_loc_shape(raw.src_line, raw.src_col));
+        let (sdst, pdst) = try!(pack_loc_shape(raw.dst_line, raw.dst_col));
+        let (ssrc, psrc) = try!(pack_loc_shape(raw.src_line, raw.src_col));
 
         Ok(IndexItem {
             packed_locinfo: (
-                ((shape_dst as u64) << 63) |
-                ((shape_src as u64) << 62) |
-                ((packed_dst as u64) << 31) |
-                (packed_src as u64)
+                ((sdst as u64) << 63) |
+                ((ssrc as u64) << 62) |
+                ((pdst as u64) << 31) |
+                (psrc as u64)
             ),
-            ids: (packed_src_id << 18) | packed_name_id,
+            ids: (psrc_id << 18) | pname_id,
         })
     }
 
@@ -132,24 +132,26 @@ impl IndexItem {
         name_id
     }
 
+    fn packed_locinfo(&self, idx: usize) -> (u32, u32) {
+        let (s1, s2) = if idx == 0 { (63, 31) } else { (62, 0) };
+        unpack_loc_shape(((self.packed_locinfo >> s1) & 0x1) as u8,
+                         ((self.packed_locinfo >> s2) & 0x7fffffff) as u32)
+    }
+
     pub fn dst_line(&self) -> u32 {
-        unpack_loc_shape(((self.packed_locinfo >> 63) & 0x1) as u8,
-                         ((self.packed_locinfo >> 31) & 0x7fffffff) as u32).0
+        self.packed_locinfo(0).0
     }
 
     pub fn dst_col(&self) -> u32 {
-        unpack_loc_shape(((self.packed_locinfo >> 63) & 0x1) as u8,
-                         ((self.packed_locinfo >> 31) & 0x7fffffff) as u32).1
+        self.packed_locinfo(0).1
     }
 
     pub fn src_line(&self) -> u32 {
-        unpack_loc_shape(((self.packed_locinfo >> 62) & 0x1) as u8,
-                         ((self.packed_locinfo >> 0) & 0x7fffffff) as u32).0
+        self.packed_locinfo(1).0
     }
 
     pub fn src_col(&self) -> u32 {
-        unpack_loc_shape(((self.packed_locinfo >> 62) & 0x1) as u8,
-                         ((self.packed_locinfo >> 0) & 0x7fffffff) as u32).1
+        self.packed_locinfo(1).1
     }
 }
 
@@ -204,34 +206,28 @@ impl<'a> MemDb<'a> {
     }
 
     pub fn get_token(&'a self, idx: u32) -> Option<Token<'a>> {
-        self.index().ok().and_then(|index| {
-            (&index.get(idx as usize)).map(|ii| {
-                Token {
-                    db: self,
-                    raw: RawToken {
-                        dst_line: ii.dst_line(),
-                        dst_col: ii.dst_col(),
-                        src_line: ii.src_line(),
-                        src_col: ii.src_col(),
-                        src_id: ii.src_id(),
-                        name_id: ii.name_id(),
-                    }
+        self.index_at(idx).map(|ii| {
+            Token {
+                db: self,
+                raw: RawToken {
+                    dst_line: ii.dst_line(),
+                    dst_col: ii.dst_col(),
+                    src_line: ii.src_line(),
+                    src_col: ii.src_col(),
+                    src_id: ii.src_id(),
+                    name_id: ii.name_id(),
                 }
-            })
+            }
         })
     }
 
     pub fn lookup_token(&'a self, line: u32, col: u32) -> Option<Token<'a>> {
-        let index = match self.index() {
-            Ok(idx) => idx,
-            Err(_) => { return None; }
-        };
         let mut low = 0;
-        let mut high = index.len();
+        let mut high = self.index_size();
 
         while low < high {
             let mid = (low + high) / 2;
-            let ii = &index[mid as usize];
+            let ii = self.index_at(mid).unwrap();
             if (line, col) < (ii.dst_line(), ii.dst_col()) {
                 high = mid;
             } else {
@@ -239,7 +235,7 @@ impl<'a> MemDb<'a> {
             }
         }
 
-        if low > 0 && low <= index.len() {
+        if low > 0 && low <= self.index_size() {
             self.get_token(low as u32 - 1)
         } else {
             None
@@ -293,6 +289,18 @@ impl<'a> MemDb<'a> {
         unsafe {
             Ok(mem::transmute(try!(self.get_data(0, mem::size_of::<MapHead>())).as_ptr()))
         }
+    }
+
+    #[inline(always)]
+    fn index_size(&self) -> u32 {
+        self.header().map(|x| x.index_size).unwrap_or(0)
+    }
+
+    #[inline(always)]
+    fn index_at(&self, idx: u32) -> Option<&IndexItem> {
+        self.index().ok().and_then(|index| {
+            index.get(idx as usize)
+        })
     }
 
     #[inline(always)]
