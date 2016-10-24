@@ -489,7 +489,7 @@ fn sourcemap_to_memdb_common<W: Write>(sm: &SourceMap, mut w: W, opts: DumpOptio
                 have_sources = true;
                 source_contents.push(idx);
                 let mut compressed = vec![];
-                let mut compr = BrotliEncoder::new(contents.as_bytes(), 0);
+                let mut compr = BrotliEncoder::new(contents.as_bytes(), 4);
                 try!(compr.read_to_end(&mut compressed));
                 idx += try!(write_str(&mut w, &compressed[..]));
             } else {
