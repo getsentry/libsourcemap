@@ -438,7 +438,7 @@ fn sourcemap_to_memdb_common<W: Write>(sm: &SourceMap, mut w: W, opts: DumpOptio
         version: 1,
         index_size: sm.get_index_size() as u32,
         names_start: 0,
-        names_count: sm.get_name_count(),
+        names_count: if opts.with_names { sm.get_name_count() } else { 0 },
         sources_start: 0,
         sources_count: sm.get_source_count(),
         source_contents_start: 0,
