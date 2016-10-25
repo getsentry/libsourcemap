@@ -14,39 +14,12 @@ use sourcemap::{RawToken, SourceMap};
 use brotli2::read::{BrotliEncoder, BrotliDecoder};
 
 use errors::{ErrorKind, Result};
+use memidx::{IndexItem, LargeIndexItem, CompactIndexItem, VeryCompactIndexItem};
 
 const VERSION : u8 = 1;
 const FLAG_NO_NAMES : u32 = 1;
+const FLAG_NO_SRCCOL : u32 = 2;
 
-
-#[derive(Debug, Copy, Clone)]
-#[repr(C, packed)]
-pub struct LargeIndexItem {
-    pub packed_locinfo: u64,
-    pub ids: u32,
-}
-
-trait IndexItem {
-    fn src_id(&self) -> u32;
-    fn name_id(&self) -> u32;
-    fn packed_locinfo(&self, idx: usize) -> (u32, u32);
-
-    fn dst_line(&self) -> u32 {
-        self.packed_locinfo(0).0
-    }
-
-    fn dst_col(&self) -> u32 {
-        self.packed_locinfo(0).1
-    }
-
-    fn src_line(&self) -> u32 {
-        self.packed_locinfo(1).0
-    }
-
-    fn src_col(&self) -> u32 {
-        self.packed_locinfo(1).1
-    }
-}
 
 #[derive(Debug, Copy, Clone)]
 #[repr(C, packed)]
@@ -86,84 +59,6 @@ fn verify_version<'a>(rv: MemDb<'a>) -> Result<MemDb<'a>> {
         Err(ErrorKind::UnsupportedMemDbVersion.into())
     } else {
         Ok(rv)
-    }
-}
-
-fn pack_loc_shape(line: u32, col: u32) -> Result<(u8, u32)> {
-    fn mask(x: u32, m: u32) -> Result<u32> {
-        let p = x & m;
-        if p != x {
-            Err(ErrorKind::LocationOverflow.into())
-        } else {
-            Ok(p)
-        }
-    }
-
-    Ok(if line > col {
-        (1, (try!(mask(line, 0x1ffff)) << 14) | try!(mask(col, 0x3fff)))
-    } else {
-        (0, (try!(mask(line, 0x3fff)) << 17) | try!(mask(col, 0x1ffff)))
-    })
-}
-
-fn unpack_loc_shape(shape: u8, packed: u32) -> (u32, u32) {
-    if shape == 1 {
-        (packed >> 14, packed & 0x3fff)
-    } else {
-        (packed >> 17, packed & 0x1ffff)
-    }
-}
-
-
-impl LargeIndexItem {
-
-    pub fn new(raw: &RawToken) -> Result<LargeIndexItem> {
-        let psrc_id : u32 = raw.src_id & 0x3fff;
-        let pname_id : u32 = raw.name_id & 0x3ffff;
-        if raw.src_id != !0 && psrc_id >= 0x3fff {
-            return Err(ErrorKind::TooManySources.into());
-        }
-        if raw.name_id != !0 && pname_id >= 0x3ffff {
-            return Err(ErrorKind::TooManyNames.into());
-        }
-
-        let (sdst, pdst) = try!(pack_loc_shape(raw.dst_line, raw.dst_col));
-        let (ssrc, psrc) = try!(pack_loc_shape(raw.src_line, raw.src_col));
-
-        Ok(LargeIndexItem {
-            packed_locinfo: (
-                ((sdst as u64) << 63) |
-                ((ssrc as u64) << 62) |
-                ((pdst as u64) << 31) |
-                (psrc as u64)
-            ),
-            ids: (psrc_id << 18) | pname_id,
-        })
-    }
-}
-
-impl IndexItem for LargeIndexItem {
-
-    fn src_id(&self) -> u32 {
-        let mut src_id : u32 = self.ids >> 18;
-        if src_id == 0x3fff {
-            src_id = !0;
-        }
-        src_id
-    }
-
-    fn name_id(&self) -> u32 {
-        let mut name_id : u32 = self.ids & 0x3ffff;
-        if name_id == 0x3ffff {
-            name_id = !0;
-        }
-        name_id
-    }
-
-    fn packed_locinfo(&self, idx: usize) -> (u32, u32) {
-        let (s1, s2) = if idx == 0 { (63, 31) } else { (62, 0) };
-        unpack_loc_shape(((self.packed_locinfo >> s1) & 0x1) as u8,
-                         ((self.packed_locinfo >> s2) & 0x7fffffff) as u32)
     }
 }
 
@@ -315,12 +210,19 @@ impl<'a> MemDb<'a> {
 
     #[inline(always)]
     fn index_at(&self, idx: u32) -> Option<&IndexItem> {
-        let index : Option<&[LargeIndexItem]> = self.header().ok().and_then(|head| {
+        self.header().ok().and_then(|head| {
             let off = mem::size_of::<MapHead>();
-            self.get_slice(off, head.index_size as usize).ok()
-        });
-        index.and_then(|index| {
-            index.get(idx as usize).map(|x| x as &IndexItem)
+            let sz = head.index_size as usize;
+            if head.flags & FLAG_NO_SRCCOL != 0 {
+                let index : Option<&[VeryCompactIndexItem]> = self.get_slice(off, sz).ok();
+                index.and_then(|x| x.get(idx as usize).map(|x| x as &IndexItem))
+            } else if head.flags & FLAG_NO_NAMES != 0 {
+                let index : Option<&[CompactIndexItem]> = self.get_slice(off, sz).ok();
+                index.and_then(|x| x.get(idx as usize).map(|x| x as &IndexItem))
+            } else {
+                let index : Option<&[LargeIndexItem]> = self.get_slice(off, sz).ok();
+                index.and_then(|x| x.get(idx as usize).map(|x| x as &IndexItem))
+            }
         })
     }
 
@@ -476,13 +378,29 @@ fn sourcemap_to_memdb_common<W: Write>(sm: &SourceMap, mut w: W, opts: DumpOptio
     // this will later be the information where to skip to for the TOCs
     let mut idx = try!(write_obj(&mut w, &head));
 
+    // do we have a source col?
+    let have_src_col = sm.index_iter().find(|&(_, _, token_id)| {
+        let token = sm.get_token(token_id).unwrap();
+        token.get_src_col() > 0
+    }).is_some() || opts.with_names;
+
+    if !have_src_col {
+        head.flags |= FLAG_NO_SRCCOL;
+    }
+
     // write the index
     for (line, col, token_id) in sm.index_iter() {
         let token = sm.get_token(token_id).unwrap();
         let raw = token.get_raw_token();
         assert!(line == raw.dst_line);
         assert!(col == raw.dst_col);
-        idx += try!(write_obj(&mut w, &try!(LargeIndexItem::new(&raw))));
+        if opts.with_names {
+            idx += try!(write_obj(&mut w, &try!(LargeIndexItem::new(&raw))));
+        } else if have_src_col {
+            idx += try!(write_obj(&mut w, &try!(CompactIndexItem::new(&raw))));
+        } else {
+            idx += try!(write_obj(&mut w, &try!(VeryCompactIndexItem::new(&raw))));
+        }
     }
 
     // write names

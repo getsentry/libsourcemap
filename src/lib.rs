@@ -9,6 +9,7 @@ extern crate varinteger;
 extern crate error_chain;
 
 mod errors;
+pub mod memidx;
 pub mod memdb;
 
 pub use errors::{Error, ErrorKind, ChainErr, Result};
