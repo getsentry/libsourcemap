@@ -371,7 +371,7 @@ fn sourcemap_to_memdb_common<W: Write>(sm: &SourceMap, mut w: W, opts: DumpOptio
     }
 
     // write the index
-    for (line, col, token_id) in sm.index_iter() {
+    for (_, _, token_id) in sm.index_iter() {
         let raw = sm.get_token(token_id).unwrap().get_raw_token();
         idx += try!(head.index_layout.write_token(&mut w, &raw));
     }
