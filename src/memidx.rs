@@ -11,7 +11,7 @@ fn idsz(id: u32) -> u32 {
     if id == !0 {
         1
     } else {
-        iclz(id) + 1
+        iclz(id + 1)
     }
 }
 
