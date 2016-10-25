@@ -42,12 +42,12 @@ def verify_index(index, source):
         if substring[:1] == '"':
             continue
 
-        assert token.name == substring
+        assert token.name == substring, (token.name, substring)
 
 
 def verify_token_equivalence(index, mem_index):
     for tok1, tok2 in izip(index, mem_index):
-        assert tok1 == tok2
+        assert tok1 == tok2, (tok1, tok2)
 
 
 def verify_token_search(index):
@@ -61,4 +61,4 @@ def verify_token_search(index):
             rng = (token.dst_col,)
         for col in rng:
             token_match = index.lookup_token(token.dst_line, col)
-            assert token_match == token
+            assert token_match == token, (token_match, token)
