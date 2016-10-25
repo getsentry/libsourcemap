@@ -18,9 +18,31 @@ use errors::{ErrorKind, Result};
 
 #[derive(Debug, Copy, Clone)]
 #[repr(C, packed)]
-pub struct IndexItem {
+pub struct LargeIndexItem {
     pub packed_locinfo: u64,
     pub ids: u32,
+}
+
+trait IndexItem {
+    fn src_id(&self) -> u32;
+    fn name_id(&self) -> u32;
+    fn packed_locinfo(&self, idx: usize) -> (u32, u32);
+
+    fn dst_line(&self) -> u32 {
+        self.packed_locinfo(0).0
+    }
+
+    fn dst_col(&self) -> u32 {
+        self.packed_locinfo(0).1
+    }
+
+    fn src_line(&self) -> u32 {
+        self.packed_locinfo(1).0
+    }
+
+    fn src_col(&self) -> u32 {
+        self.packed_locinfo(1).1
+    }
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -90,9 +112,9 @@ fn unpack_loc_shape(shape: u8, packed: u32) -> (u32, u32) {
 }
 
 
-impl IndexItem {
+impl LargeIndexItem {
 
-    pub fn new(raw: &RawToken) -> Result<IndexItem> {
+    pub fn new(raw: &RawToken) -> Result<LargeIndexItem> {
         let psrc_id : u32 = raw.src_id & 0x3fff;
         let pname_id : u32 = raw.name_id & 0x3ffff;
         if raw.src_id != !0 && psrc_id >= 0x3fff {
@@ -105,7 +127,7 @@ impl IndexItem {
         let (sdst, pdst) = try!(pack_loc_shape(raw.dst_line, raw.dst_col));
         let (ssrc, psrc) = try!(pack_loc_shape(raw.src_line, raw.src_col));
 
-        Ok(IndexItem {
+        Ok(LargeIndexItem {
             packed_locinfo: (
                 ((sdst as u64) << 63) |
                 ((ssrc as u64) << 62) |
@@ -115,8 +137,11 @@ impl IndexItem {
             ids: (psrc_id << 18) | pname_id,
         })
     }
+}
 
-    pub fn src_id(&self) -> u32 {
+impl IndexItem for LargeIndexItem {
+
+    fn src_id(&self) -> u32 {
         let mut src_id : u32 = self.ids >> 18;
         if src_id == 0x3fff {
             src_id = !0;
@@ -124,7 +149,7 @@ impl IndexItem {
         src_id
     }
 
-    pub fn name_id(&self) -> u32 {
+    fn name_id(&self) -> u32 {
         let mut name_id : u32 = self.ids & 0x3ffff;
         if name_id == 0x3ffff {
             name_id = !0;
@@ -136,22 +161,6 @@ impl IndexItem {
         let (s1, s2) = if idx == 0 { (63, 31) } else { (62, 0) };
         unpack_loc_shape(((self.packed_locinfo >> s1) & 0x1) as u8,
                          ((self.packed_locinfo >> s2) & 0x7fffffff) as u32)
-    }
-
-    pub fn dst_line(&self) -> u32 {
-        self.packed_locinfo(0).0
-    }
-
-    pub fn dst_col(&self) -> u32 {
-        self.packed_locinfo(0).1
-    }
-
-    pub fn src_line(&self) -> u32 {
-        self.packed_locinfo(1).0
-    }
-
-    pub fn src_col(&self) -> u32 {
-        self.packed_locinfo(1).1
     }
 }
 
@@ -298,16 +307,13 @@ impl<'a> MemDb<'a> {
 
     #[inline(always)]
     fn index_at(&self, idx: u32) -> Option<&IndexItem> {
-        self.index().ok().and_then(|index| {
-            index.get(idx as usize)
+        let index : Option<&[LargeIndexItem]> = self.header().ok().and_then(|head| {
+            let off = mem::size_of::<MapHead>();
+            self.get_slice(off, head.index_size as usize).ok()
+        });
+        index.and_then(|index| {
+            index.get(idx as usize).map(|x| x as &IndexItem)
         })
-    }
-
-    #[inline(always)]
-    fn index(&self) -> Result<&[IndexItem]> {
-        let head = try!(self.header());
-        let off = mem::size_of::<MapHead>();
-        self.get_slice(off, head.index_size as usize)
     }
 
     #[inline(always)]
@@ -462,7 +468,7 @@ fn sourcemap_to_memdb_common<W: Write>(sm: &SourceMap, mut w: W, opts: DumpOptio
         let raw = token.get_raw_token();
         assert!(line == raw.dst_line);
         assert!(col == raw.dst_col);
-        idx += try!(write_obj(&mut w, &try!(IndexItem::new(&raw))));
+        idx += try!(write_obj(&mut w, &try!(LargeIndexItem::new(&raw))));
     }
 
     // write names
