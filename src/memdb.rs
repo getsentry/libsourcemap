@@ -15,6 +15,9 @@ use brotli2::read::{BrotliEncoder, BrotliDecoder};
 
 use errors::{ErrorKind, Result};
 
+const VERSION : u8 = 1;
+const FLAG_NO_NAMES : u32 = 1;
+
 
 #[derive(Debug, Copy, Clone)]
 #[repr(C, packed)]
@@ -48,7 +51,7 @@ trait IndexItem {
 #[derive(Debug, Copy, Clone)]
 #[repr(C, packed)]
 pub struct MapHead {
-    pub version: u32,
+    pub flags: u32,
     pub index_size: u32,
     pub names_start: u32,
     pub names_count: u32,
@@ -79,7 +82,7 @@ pub struct Token<'a> {
 
 
 fn verify_version<'a>(rv: MemDb<'a>) -> Result<MemDb<'a>> {
-    if try!(rv.header()).version != 1 {
+    if try!(rv.version()) != VERSION {
         Err(ErrorKind::UnsupportedMemDbVersion.into())
     } else {
         Ok(rv)
@@ -301,6 +304,11 @@ impl<'a> MemDb<'a> {
     }
 
     #[inline(always)]
+    fn version(&self) -> Result<u8> {
+        self.header().map(|x| (x.flags >> 24) as u8)
+    }
+
+    #[inline(always)]
     fn index_size(&self) -> u32 {
         self.header().map(|x| x.index_size).unwrap_or(0)
     }
@@ -449,15 +457,21 @@ fn sourcemap_to_memdb_common<W: Write>(sm: &SourceMap, mut w: W, opts: DumpOptio
     -> Result<(W, MapHead)>
 {
     let mut head = MapHead {
-        version: 1,
+        flags: (VERSION as u32) << 24,
         index_size: sm.get_index_size() as u32,
         names_start: 0,
-        names_count: if opts.with_names { sm.get_name_count() } else { 0 },
+        names_count: 0,
         sources_start: 0,
         sources_count: sm.get_source_count(),
         source_contents_start: 0,
         source_contents_count: 0,
     };
+
+    if !opts.with_names {
+        head.flags |= FLAG_NO_NAMES;
+    } else {
+        head.names_count = sm.get_name_count();
+    }
 
     // this will later be the information where to skip to for the TOCs
     let mut idx = try!(write_obj(&mut w, &head));
