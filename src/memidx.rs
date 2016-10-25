@@ -1,215 +1,145 @@
+use std::cmp;
+use std::io::Write;
+
 use sourcemap::RawToken;
 
-use errors::{ErrorKind, Result};
+use errors::Result;
+use bitpacker::{BitPacker, BitUnpacker, iclz};
 
 
-fn pack_loc_shape(line: u32, col: u32) -> Result<(u8, u32)> {
-    fn mask(x: u32, m: u32) -> Result<u32> {
-        let p = x & m;
-        if p != x {
-            Err(ErrorKind::LocationOverflow.into())
-        } else {
-            Ok(p)
-        }
-    }
-
-    Ok(if line > col {
-        (1, (try!(mask(line, 0x1ffff)) << 14) | try!(mask(col, 0x3fff)))
+fn idsz(id: u32) -> u32 {
+    if id == !0 {
+        1
     } else {
-        (0, (try!(mask(line, 0x3fff)) << 17) | try!(mask(col, 0x1ffff)))
-    })
-}
-
-fn unpack_loc_shape(shape: u8, packed: u32) -> (u32, u32) {
-    if shape == 1 {
-        (packed >> 14, packed & 0x3fff)
-    } else {
-        (packed >> 17, packed & 0x1ffff)
+        iclz(id) + 1
     }
-}
-
-
-#[derive(Debug, Copy, Clone)]
-#[repr(C, packed)]
-pub struct LargeIndexItem {
-    pub packed_locinfo: u64,
-    pub ids: u32,
 }
 
 #[derive(Debug, Copy, Clone)]
 #[repr(C, packed)]
-pub struct CompactIndexItem {
-    pub packed_locinfo: u64,
-    pub src_id: u16,
+pub struct IndexLayout {
+    pub dst_line_bits: u8,
+    pub dst_col_bits: u8,
+    pub src_line_bits: u8,
+    pub src_col_bits: u8,
+    pub src_id_bits: u8,
+    pub name_id_bits: u8,
 }
 
-#[derive(Debug, Copy, Clone)]
-#[repr(C, packed)]
-pub struct VeryCompactIndexItem {
-    pub packed_info: u64,
-}
-
-
-pub trait IndexItem {
-    fn src_id(&self) -> u32;
-    fn name_id(&self) -> u32;
-    fn packed_locinfo(&self, idx: usize) -> (u32, u32);
-
-    fn dst_line(&self) -> u32 {
-        self.packed_locinfo(0).0
-    }
-
-    fn dst_col(&self) -> u32 {
-        self.packed_locinfo(0).1
-    }
-
-    fn src_line(&self) -> u32 {
-        self.packed_locinfo(1).0
-    }
-
-    fn src_col(&self) -> u32 {
-        self.packed_locinfo(1).1
-    }
-}
-
-impl LargeIndexItem {
-
-    pub fn new(raw: &RawToken) -> Result<LargeIndexItem> {
-        let psrc_id : u32 = raw.src_id & 0x3fff;
-        let pname_id : u32 = raw.name_id & 0x3ffff;
-        if raw.src_id != !0 && psrc_id >= 0x3fff {
-            return Err(ErrorKind::TooManySources.into());
-        }
-        if raw.name_id != !0 && pname_id >= 0x3ffff {
-            return Err(ErrorKind::TooManyNames.into());
-        }
-
-        let (sdst, pdst) = try!(pack_loc_shape(raw.dst_line, raw.dst_col));
-        let (ssrc, psrc) = try!(pack_loc_shape(raw.src_line, raw.src_col));
-
-        Ok(LargeIndexItem {
-            packed_locinfo: (
-                ((sdst as u64) << 63) |
-                ((ssrc as u64) << 62) |
-                ((pdst as u64) << 31) |
-                (psrc as u64)
-            ),
-            ids: (psrc_id << 18) | pname_id,
-        })
-    }
-}
-
-impl IndexItem for LargeIndexItem {
-
-    fn src_id(&self) -> u32 {
-        let mut src_id : u32 = self.ids >> 18;
-        if src_id == 0x3fff {
-            src_id = !0;
-        }
-        src_id
-    }
-
-    fn name_id(&self) -> u32 {
-        let mut name_id : u32 = self.ids & 0x3ffff;
-        if name_id == 0x3ffff {
-            name_id = !0;
-        }
-        name_id
-    }
-
-    fn packed_locinfo(&self, idx: usize) -> (u32, u32) {
-        let (s1, s2) = if idx == 0 { (63, 31) } else { (62, 0) };
-        unpack_loc_shape(((self.packed_locinfo >> s1) & 0x1) as u8,
-                         ((self.packed_locinfo >> s2) & 0x7fffffff) as u32)
-    }
-}
-
-impl CompactIndexItem {
-
-    pub fn new(raw: &RawToken) -> Result<CompactIndexItem> {
-        let src_id = if raw.src_id >= 0xffff {
-            return Err(ErrorKind::TooManySources.into());
-        } else if raw.src_id == !0 {
-            !0u16
-        } else {
-            raw.src_id as u16
-        };
-
-        let (sdst, pdst) = try!(pack_loc_shape(raw.dst_line, raw.dst_col));
-        let (ssrc, psrc) = try!(pack_loc_shape(raw.src_line, raw.src_col));
-
-        Ok(CompactIndexItem {
-            packed_locinfo: (
-                ((sdst as u64) << 63) |
-                ((ssrc as u64) << 62) |
-                ((pdst as u64) << 31) |
-                (psrc as u64)
-            ),
-            src_id: src_id,
-        })
-    }
-}
-
-impl IndexItem for CompactIndexItem {
-
-    fn src_id(&self) -> u32 {
-        self.src_id as u32
-    }
-
-    fn name_id(&self) -> u32 {
-        !0
-    }
-
-    fn packed_locinfo(&self, idx: usize) -> (u32, u32) {
-        let (s1, s2) = if idx == 0 { (63, 31) } else { (62, 0) };
-        unpack_loc_shape(((self.packed_locinfo >> s1) & 0x1) as u8,
-                         ((self.packed_locinfo >> s2) & 0x7fffffff) as u32)
-    }
-}
-
-impl VeryCompactIndexItem {
-
-    pub fn new(raw: &RawToken) -> Result<VeryCompactIndexItem> {
-        let src_id = if raw.src_id >= 0xffff {
-            return Err(ErrorKind::TooManySources.into());
-        } else if raw.src_id == !0 {
-            !0u16
-        } else {
-            raw.src_id as u16
-        };
-
-        let (sdst, pdst) = try!(pack_loc_shape(raw.dst_line, raw.dst_col));
-        if raw.src_line >= 0xffff || raw.src_col > 0 {
-            return Err(ErrorKind::LocationOverflow.into());
-        }
-
-        Ok(VeryCompactIndexItem {
-            packed_info: (
-                ((sdst as u64) << 63) |
-                ((pdst as u64) << 32) |
-                ((raw.src_line as u64) << 16) |
-                (src_id as u64)
-            ),
-        })
-    }
-}
-
-impl IndexItem for VeryCompactIndexItem {
-
-    fn src_id(&self) -> u32 {
-        (self.packed_info & 0xffff) as u32
-    }
-
-    fn name_id(&self) -> u32 {
-        !0
-    }
-
-    fn packed_locinfo(&self, idx: usize) -> (u32, u32) {
-        if idx == 0 {
-            unpack_loc_shape(((self.packed_info >> 63) & 0x1) as u8,
-                             ((self.packed_info >> 32) & 0x7fffffff) as u32)
-        } else {
-            (((self.packed_info >> 16) & 0xffff) as u32, 0)
+impl IndexLayout {
+    pub fn new() -> IndexLayout {
+        IndexLayout {
+            dst_line_bits: 0,
+            dst_col_bits: 0,
+            src_line_bits: 0,
+            src_col_bits: 0,
+            src_id_bits: 0,
+            name_id_bits: 0,
         }
     }
+
+    pub fn reshape(&mut self, raw: &RawToken, with_names: bool) {
+        self.dst_line_bits = cmp::max(self.dst_line_bits, iclz(raw.dst_line) as u8);
+        self.dst_col_bits = cmp::max(self.dst_col_bits, iclz(raw.dst_col) as u8);
+        self.src_line_bits = cmp::max(self.src_line_bits, iclz(raw.src_line) as u8);
+        self.src_col_bits = cmp::max(self.src_col_bits, iclz(raw.src_col) as u8);
+        self.src_id_bits = cmp::max(self.src_id_bits, idsz(raw.src_id) as u8);
+        if with_names {
+            self.name_id_bits = cmp::max(self.name_id_bits, idsz(raw.name_id) as u8);
+        }
+    }
+
+    pub fn item_size(&self) -> u32 {
+        (((
+            self.dst_line_bits +
+            self.dst_col_bits + 
+            self.src_line_bits +
+            self.src_col_bits + 
+            self.src_id_bits +
+            self.name_id_bits
+        ) as f32) / 8.0).ceil() as u32
+    }
+
+    pub fn write_token<W: Write>(&self, w: &mut W, raw: &RawToken) -> Result<u32> {
+        let mut buf = [0u8; 64];
+        {
+            let mut bp = BitPacker::new(&mut buf);
+            bp.write(raw.dst_line, self.dst_line_bits as usize);
+            bp.write(raw.dst_col, self.dst_col_bits as usize);
+            bp.write(raw.src_line, self.src_line_bits as usize);
+            bp.write(raw.src_col, self.src_col_bits as usize);
+            bp.write_id(raw.src_id, self.src_id_bits as usize);
+            bp.write_id(raw.name_id, self.name_id_bits as usize);
+            bp.flush();
+        }
+        let sz = self.item_size();
+        try!(w.write_all(&buf[..sz as usize]));
+        Ok(sz)
+    }
+
+    pub fn load_token(&self, bytes: &[u8]) -> RawToken {
+        let mut bup = BitUnpacker::new(bytes);
+        RawToken {
+            dst_line: bup.read(self.dst_line_bits as usize),
+            dst_col: bup.read(self.dst_col_bits as usize),
+            src_line: bup.read(self.src_line_bits as usize),
+            src_col: bup.read(self.src_col_bits as usize),
+            src_id: bup.read_id(self.src_id_bits as usize),
+            name_id: bup.read_id(self.name_id_bits as usize),
+        }
+    }
+}
+
+#[test]
+fn test_token_writing() {
+    let tok = RawToken {
+        dst_line: 42,
+        dst_col: 23,
+        src_line: 1025,
+        src_col: 0,
+        src_id: 11,
+        name_id: 23,
+    };
+
+    let mut layout = IndexLayout::new();
+    layout.reshape(&tok, true);
+    assert_eq!(layout.item_size(), 4);
+    let mut buf = vec![];
+    assert_eq!(layout.write_token(&mut buf, &tok).unwrap(), 4);
+    let tok2 = layout.load_token(&buf);
+    assert_eq!(tok, tok2);
+
+    let large_tok = RawToken {
+        dst_line: 421234,
+        dst_col: 1024,
+        src_line: 1025,
+        src_col: 0,
+        src_id: 11,
+        name_id: 23,
+    };
+
+    let mut layout = IndexLayout::new();
+    layout.reshape(&large_tok, true);
+    assert_eq!(layout.item_size(), 7);
+    let mut buf = vec![];
+    assert_eq!(layout.write_token(&mut buf, &large_tok).unwrap(), 7);
+    let large_tok2 = layout.load_token(&buf);
+    assert_eq!(large_tok, large_tok2);
+
+    let vlarge_tok = RawToken {
+        dst_line: 421234,
+        dst_col: 1024,
+        src_line: 1025,
+        src_col: 3,
+        src_id: 11,
+        name_id: 23232,
+    };
+
+    let mut layout = IndexLayout::new();
+    layout.reshape(&vlarge_tok, true);
+    assert_eq!(layout.item_size(), 8);
+    let mut buf = vec![];
+    assert_eq!(layout.write_token(&mut buf, &vlarge_tok).unwrap(), 8);
+    let vlarge_tok2 = layout.load_token(&buf);
+    assert_eq!(vlarge_tok, vlarge_tok2);
 }

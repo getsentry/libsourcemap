@@ -14,17 +14,16 @@ use sourcemap::{RawToken, SourceMap};
 use brotli2::read::{BrotliEncoder, BrotliDecoder};
 
 use errors::{ErrorKind, Result};
-use memidx::{IndexItem, LargeIndexItem, CompactIndexItem, VeryCompactIndexItem};
+use memidx::IndexLayout;
 
-const VERSION : u8 = 1;
-const FLAG_NO_NAMES : u32 = 1;
-const FLAG_NO_SRCCOL : u32 = 2;
+const VERSION : u16 = 1;
 
 
 #[derive(Debug, Copy, Clone)]
 #[repr(C, packed)]
 pub struct MapHead {
-    pub flags: u32,
+    pub version: u16,
+    pub index_layout: IndexLayout,
     pub index_size: u32,
     pub names_start: u32,
     pub names_count: u32,
@@ -113,17 +112,10 @@ impl<'a> MemDb<'a> {
     }
 
     pub fn get_token(&'a self, idx: u32) -> Option<Token<'a>> {
-        self.index_at(idx).map(|ii| {
+        self.index_at(idx).map(|raw| {
             Token {
                 db: self,
-                raw: RawToken {
-                    dst_line: ii.dst_line(),
-                    dst_col: ii.dst_col(),
-                    src_line: ii.src_line(),
-                    src_col: ii.src_col(),
-                    src_id: ii.src_id(),
-                    name_id: ii.name_id(),
-                }
+                raw: raw,
             }
         })
     }
@@ -134,8 +126,8 @@ impl<'a> MemDb<'a> {
 
         while low < high {
             let mid = (low + high) / 2;
-            let ii = self.index_at(mid).unwrap();
-            if (line, col) < (ii.dst_line(), ii.dst_col()) {
+            let raw = self.index_at(mid).unwrap();
+            if (line, col) < (raw.dst_line, raw.dst_col) {
                 high = mid;
             } else {
                 low = mid + 1;
@@ -199,8 +191,8 @@ impl<'a> MemDb<'a> {
     }
 
     #[inline(always)]
-    fn version(&self) -> Result<u8> {
-        self.header().map(|x| (x.flags >> 24) as u8)
+    fn version(&self) -> Result<u16> {
+        self.header().map(|x| x.version)
     }
 
     #[inline(always)]
@@ -209,19 +201,18 @@ impl<'a> MemDb<'a> {
     }
 
     #[inline(always)]
-    fn index_at(&self, idx: u32) -> Option<&IndexItem> {
+    fn index_at(&self, idx: u32) -> Option<RawToken> {
+        let idx = idx as usize;
         self.header().ok().and_then(|head| {
-            let off = mem::size_of::<MapHead>();
-            let sz = head.index_size as usize;
-            if head.flags & FLAG_NO_SRCCOL != 0 {
-                let index : Option<&[VeryCompactIndexItem]> = self.get_slice(off, sz).ok();
-                index.and_then(|x| x.get(idx as usize).map(|x| x as &IndexItem))
-            } else if head.flags & FLAG_NO_NAMES != 0 {
-                let index : Option<&[CompactIndexItem]> = self.get_slice(off, sz).ok();
-                index.and_then(|x| x.get(idx as usize).map(|x| x as &IndexItem))
+            let item_size = head.index_layout.item_size() as usize;
+            let off = mem::size_of::<MapHead>() + item_size * idx;
+            let count = head.index_size as usize;
+            if idx >= count {
+                None
             } else {
-                let index : Option<&[LargeIndexItem]> = self.get_slice(off, sz).ok();
-                index.and_then(|x| x.get(idx as usize).map(|x| x as &IndexItem))
+                self.get_data(off, item_size).ok().map(|bytes| {
+                    head.index_layout.load_token(bytes)
+                })
             }
         })
     }
@@ -359,7 +350,8 @@ fn sourcemap_to_memdb_common<W: Write>(sm: &SourceMap, mut w: W, opts: DumpOptio
     -> Result<(W, MapHead)>
 {
     let mut head = MapHead {
-        flags: (VERSION as u32) << 24,
+        version: VERSION,
+        index_layout: IndexLayout::new(),
         index_size: sm.get_index_size() as u32,
         names_start: 0,
         names_count: 0,
@@ -369,38 +361,27 @@ fn sourcemap_to_memdb_common<W: Write>(sm: &SourceMap, mut w: W, opts: DumpOptio
         source_contents_count: 0,
     };
 
-    if !opts.with_names {
-        head.flags |= FLAG_NO_NAMES;
-    } else {
-        head.names_count = sm.get_name_count();
-    }
-
     // this will later be the information where to skip to for the TOCs
     let mut idx = try!(write_obj(&mut w, &head));
 
-    // do we have a source col?
-    let have_src_col = sm.index_iter().find(|&(_, _, token_id)| {
-        let token = sm.get_token(token_id).unwrap();
-        token.get_src_col() > 0
-    }).is_some() || opts.with_names;
-
-    if !have_src_col {
-        head.flags |= FLAG_NO_SRCCOL;
+    // figure out the index layout
+    for (_, _, token_id) in sm.index_iter() {
+        let raw = sm.get_token(token_id).unwrap().get_raw_token();
+        head.index_layout.reshape(&raw, opts.with_names);
     }
 
     // write the index
     for (line, col, token_id) in sm.index_iter() {
-        let token = sm.get_token(token_id).unwrap();
-        let raw = token.get_raw_token();
+        let raw = sm.get_token(token_id).unwrap().get_raw_token();
         assert!(line == raw.dst_line);
         assert!(col == raw.dst_col);
-        if opts.with_names {
-            idx += try!(write_obj(&mut w, &try!(LargeIndexItem::new(&raw))));
-        } else if have_src_col {
-            idx += try!(write_obj(&mut w, &try!(CompactIndexItem::new(&raw))));
-        } else {
-            idx += try!(write_obj(&mut w, &try!(VeryCompactIndexItem::new(&raw))));
-        }
+        idx += try!(head.index_layout.write_token(&mut w, &raw));
+    }
+
+    // pad out to alignment
+    for _ in 0..idx % 4 {
+        try!(w.write_all(b"\x00"));
+        idx += 1;
     }
 
     // write names
@@ -445,8 +426,12 @@ fn sourcemap_to_memdb_common<W: Write>(sm: &SourceMap, mut w: W, opts: DumpOptio
     }
 
     // write indexes
-    head.names_start = idx;
-    idx += try!(write_slice(&mut w, &names));
+    if opts.with_names {
+        head.names_start = idx;
+        head.names_count = names.len() as u32;
+        idx += try!(write_slice(&mut w, &names));
+    }
+
     head.sources_start = idx;
     idx += try!(write_slice(&mut w, &sources));
 
