@@ -1,4 +1,4 @@
-include MANIFEST.in Makefile LICENSE README.md build.py
+include MANIFEST.in Makefile LICENSE README.md build.py Cargo.toml
 recursive-include libsourcemap *
 recursive-include include *
 recursive-include src *
