@@ -22,6 +22,9 @@ lib_path = 'libsourcemap/_libsourcemap.so'
 rust_libname = 'liblibsourcemap' + env['SHLIBSUFFIX']
 rust_lib = 'target/release/' + rust_libname
 
+# Cargo doesn't seem to rebuild this if missing
+env.NoClean(rust_lib)
+
 # Build rust
 env.Command(
         target=rust_lib,
