@@ -33,7 +33,7 @@ pub struct TokenMatch<'a> {
     pub src_line: u32,
     pub src_col: u32,
     pub name: Option<&'a str>,
-    pub src: &'a str,
+    pub src: Option<&'a str>,
     pub src_id: u32,
 }
 

@@ -357,8 +357,8 @@ impl<'a> Token<'a> {
     }
 
     /// get the source if it exists as string
-    pub fn get_source(&self) -> &'a str {
-        self.db.get_source(self.raw.src_id).unwrap_or("")
+    pub fn get_source(&self) -> Option<&'a str> {
+        self.db.get_source(self.raw.src_id)
     }
 
     /// get the name if it exists as string
@@ -375,7 +375,7 @@ impl<'a> Token<'a> {
     /// `(source, src_line, src_col, name)`
     pub fn to_tuple(&self) -> (&str, u32, u32, Option<&str>) {
         (
-            self.get_source(),
+            self.get_source().unwrap_or(""),
             self.get_src_line(),
             self.get_src_col(),
             self.get_name()
@@ -397,7 +397,7 @@ impl<'a> fmt::Debug for Token<'a> {
 impl<'a> fmt::Display for Token<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}:{}:{}{}",
-               self.get_source(),
+               self.get_source().unwrap_or("<unknown>"),
                self.get_src_line(),
                self.get_src_col(),
                self.get_name().map(|x| format!(" name={}", x))

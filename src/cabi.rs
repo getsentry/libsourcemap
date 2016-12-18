@@ -58,8 +58,11 @@ unsafe fn set_token<'a>(out: *mut Token, tm: &'a TokenMatch<'a>) {
         None => ptr::null()
     };
     (*out).name_len = tm.name.map(|x| x.as_bytes().len()).unwrap_or(0) as c_uint;
-    (*out).src = tm.src.as_ptr();
-    (*out).src_len = tm.src.as_bytes().len() as c_uint;
+    (*out).src = match tm.src {
+        Some(src) => src.as_ptr(),
+        None => ptr::null()
+    };
+    (*out).src_len = tm.src.map(|x| x.as_bytes().len()).unwrap_or(0) as c_uint;
     (*out).src_id = tm.src_id;
 }
 
