@@ -39,11 +39,11 @@ pub struct TokenMatch<'a> {
 
 impl ViewOrIndex {
     pub fn from_slice(buffer: &[u8]) -> Result<ViewOrIndex> {
-        Ok(match try!(decode_slice(buffer)) {
+        Ok(match decode_slice(buffer)? {
             DecodedMap::Regular(sm) => ViewOrIndex::View(
-                try!(View::from_sourcemap(sm))),
+                View::from_sourcemap(sm)?),
             DecodedMap::Index(smi) => ViewOrIndex::Index(
-                try!(Index::from_sourcemap_index(smi)))
+                Index::from_sourcemap_index(smi)?)
         })
     }
 }
@@ -51,25 +51,25 @@ impl ViewOrIndex {
 impl View {
     pub fn json_from_slice(buffer: &[u8]) -> Result<View> {
         Ok(View {
-            map: MapRepr::Json(try!(SourceMap::from_slice(&buffer)))
+            map: MapRepr::Json(SourceMap::from_slice(&buffer)?)
         })
     }
 
     pub fn json_from_reader<R: Read>(rdr: R) -> Result<View> {
         Ok(View {
-            map: MapRepr::Json(try!(SourceMap::from_reader(rdr)))
+            map: MapRepr::Json(SourceMap::from_reader(rdr)?)
         })
     }
 
     pub fn memdb_from_vec(vec: Vec<u8>) -> Result<View> {
         Ok(View {
-            map: MapRepr::Mem(try!(MemDb::from_vec(vec)))
+            map: MapRepr::Mem(MemDb::from_vec(vec)?)
         })
     }
 
     pub fn memdb_from_path<P: AsRef<Path>>(path: P) -> Result<View> {
         Ok(View {
-            map: MapRepr::Mem(try!(MemDb::from_path(path)))
+            map: MapRepr::Mem(MemDb::from_path(path)?)
         })
     }
 
@@ -186,7 +186,7 @@ impl View {
 impl Index {
     pub fn json_from_slice(buffer: &[u8]) -> Result<Index> {
         Index::from_sourcemap_index(
-            try!(SourceMapIndex::from_slice(&buffer)))
+            SourceMapIndex::from_slice(&buffer)?)
     }
 
     pub fn from_sourcemap_index(smi: SourceMapIndex) -> Result<Index> {
@@ -196,7 +196,7 @@ impl Index {
     }
 
     pub fn into_view(self) -> Result<View> {
-        View::from_sourcemap(try!(self.index.flatten()))
+        View::from_sourcemap(self.index.flatten()?)
     }
 
     pub fn can_flatten(&self) -> bool {

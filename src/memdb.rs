@@ -57,7 +57,7 @@ pub struct Token<'a> {
 
 
 fn verify_version<'a>(rv: MemDb<'a>) -> Result<MemDb<'a>> {
-    if try!(rv.header()).version != 1 {
+    if rv.header()?.version != 1 {
         Err(ErrorKind::UnsupportedMemDbVersion.into())
     } else {
         Ok(rv)
@@ -75,9 +75,9 @@ fn pack_loc_shape(line: u32, col: u32) -> Result<(u8, u32)> {
     }
 
     Ok(if line > col {
-        (1, (try!(mask(line, 0x1ffff)) << 14) | try!(mask(col, 0x3fff)))
+        (1, (mask(line, 0x1ffff)? << 14) | mask(col, 0x3fff)?)
     } else {
-        (0, (try!(mask(line, 0x3fff)) << 17) | try!(mask(col, 0x1ffff)))
+        (0, (mask(line, 0x3fff)? << 17) | mask(col, 0x1ffff)?)
     })
 }
 
@@ -102,8 +102,8 @@ impl IndexItem {
             return Err(ErrorKind::TooManyNames.into());
         }
 
-        let (shape_dst, packed_dst) = try!(pack_loc_shape(raw.dst_line, raw.dst_col));
-        let (shape_src, packed_src) = try!(pack_loc_shape(raw.src_line, raw.src_col));
+        let (shape_dst, packed_dst) = pack_loc_shape(raw.dst_line, raw.dst_col)?;
+        let (shape_src, packed_src) = pack_loc_shape(raw.src_line, raw.src_col)?;
 
         Ok(IndexItem {
             packed_locinfo: (
@@ -170,7 +170,7 @@ impl<'a> MemDb<'a> {
     }
 
     pub fn from_path<P: AsRef<Path>>(path: P) -> Result<MemDb<'a>> {
-        let mmap = try!(Mmap::open_path(path, Protection::Read));
+        let mmap = Mmap::open_path(path, Protection::Read)?;
         verify_version(MemDb {
             backing: Backing::Mmap(mmap),
         })
@@ -268,7 +268,7 @@ impl<'a> MemDb<'a> {
         let size = mem::size_of::<T>();
         Ok(unsafe {
             slice::from_raw_parts(
-                mem::transmute(try!(self.get_data(offset, count * size)).as_ptr()),
+                mem::transmute(self.get_data(offset, count * size)?.as_ptr()),
                 count
             )
         })
@@ -291,34 +291,34 @@ impl<'a> MemDb<'a> {
     #[inline(always)]
     fn header(&self) -> Result<&MapHead> {
         unsafe {
-            Ok(mem::transmute(try!(self.get_data(0, mem::size_of::<MapHead>())).as_ptr()))
+            Ok(mem::transmute(self.get_data(0, mem::size_of::<MapHead>())?.as_ptr()))
         }
     }
 
     #[inline(always)]
     fn index(&self) -> Result<&[IndexItem]> {
-        let head = try!(self.header());
+        let head = self.header()?;
         let off = mem::size_of::<MapHead>();
         self.get_slice(off, head.index_size as usize)
     }
 
     #[inline(always)]
     fn names(&self) -> Result<&[u32]> {
-        let head = try!(self.header());
+        let head = self.header()?;
         let off = head.names_start as usize;
         self.get_slice(off, head.names_count as usize)
     }
 
     #[inline(always)]
     fn sources(&self) -> Result<&[u32]> {
-        let head = try!(self.header());
+        let head = self.header()?;
         let off = head.sources_start as usize;
         self.get_slice(off, head.sources_count as usize)
     }
 
     #[inline(always)]
     fn source_contents(&self) -> Result<&[u32]> {
-        let head = try!(self.header());
+        let head = self.header()?;
         let off = head.source_contents_start as usize;
         self.get_slice(off, head.source_contents_count as usize)
     }
@@ -409,7 +409,7 @@ fn write_obj<T, W: Write>(w: &mut W, x: &T) -> io::Result<u32> {
     unsafe {
         let bytes : *const u8 = mem::transmute(x);
         let size = mem::size_of_val(x);
-        try!(w.write_all(slice::from_raw_parts(bytes, size)));
+        w.write_all(slice::from_raw_parts(bytes, size))?;
         Ok(size as u32)
     }
 }
@@ -417,8 +417,8 @@ fn write_obj<T, W: Write>(w: &mut W, x: &T) -> io::Result<u32> {
 fn write_str<W: Write>(w: &mut W, bytes: &[u8]) -> io::Result<u32> {
     let mut buf = [0u8; 8];
     let off = varinteger::encode(bytes.len() as u64, &mut buf);
-    try!(w.write_all(&buf[..off]));
-    try!(w.write_all(bytes));
+    w.write_all(&buf[..off])?;
+    w.write_all(bytes)?;
     Ok(bytes.len() as u32 + off as u32)
 }
 
@@ -426,7 +426,7 @@ fn write_slice<T, W: Write>(w: &mut W, x: &[T]) -> io::Result<u32> {
     unsafe {
         let bytes : *const u8 = mem::transmute(x.as_ptr());
         let size = mem::size_of::<T>() * x.len();
-        try!(w.write_all(slice::from_raw_parts(bytes, size)));
+        w.write_all(slice::from_raw_parts(bytes, size))?;
         Ok(size as u32)
     }
 }
@@ -446,7 +446,7 @@ fn sourcemap_to_memdb_common<W: Write>(sm: &SourceMap, mut w: W, opts: DumpOptio
     };
 
     // this will later be the information where to skip to for the TOCs
-    let mut idx = try!(write_obj(&mut w, &head));
+    let mut idx = write_obj(&mut w, &head)?;
 
     // write the index
     for (line, col, token_id) in sm.index_iter() {
@@ -454,7 +454,7 @@ fn sourcemap_to_memdb_common<W: Write>(sm: &SourceMap, mut w: W, opts: DumpOptio
         let raw = token.get_raw_token();
         assert!(line == raw.dst_line);
         assert!(col == raw.dst_col);
-        idx += try!(write_obj(&mut w, &try!(IndexItem::new(&raw))));
+        idx += write_obj(&mut w, &IndexItem::new(&raw)?)?;
     }
 
     // write names
@@ -463,7 +463,7 @@ fn sourcemap_to_memdb_common<W: Write>(sm: &SourceMap, mut w: W, opts: DumpOptio
             let mut names = Vec::with_capacity(sm.get_name_count() as usize);
             for name in sm.names() {
                 names.push(idx);
-                idx += try!(write_str(&mut w, name.as_bytes()));
+                idx += write_str(&mut w, name.as_bytes())?;
             }
             names
         } else {
@@ -482,7 +482,7 @@ fn sourcemap_to_memdb_common<W: Write>(sm: &SourceMap, mut w: W, opts: DumpOptio
     for source_id in 0..sm.get_source_count() {
         let source = sm.get_source(source_id).unwrap();
         sources.push(idx);
-        idx += try!(write_str(&mut w, source.as_bytes()));
+        idx += write_str(&mut w, source.as_bytes())?;
 
         if opts.with_source_contents {
             if let Some(contents) = sm.get_source_contents(source_id) {
@@ -490,8 +490,8 @@ fn sourcemap_to_memdb_common<W: Write>(sm: &SourceMap, mut w: W, opts: DumpOptio
                 source_contents.push(idx);
                 let mut compressed = vec![];
                 let mut compr = BrotliEncoder::new(contents.as_bytes(), 4);
-                try!(compr.read_to_end(&mut compressed));
-                idx += try!(write_str(&mut w, &compressed[..]));
+                compr.read_to_end(&mut compressed)?;
+                idx += write_str(&mut w, &compressed[..])?;
             } else {
                 source_contents.push(!0);
             }
@@ -500,14 +500,14 @@ fn sourcemap_to_memdb_common<W: Write>(sm: &SourceMap, mut w: W, opts: DumpOptio
 
     // write indexes
     head.names_start = idx;
-    idx += try!(write_slice(&mut w, &names));
+    idx += write_slice(&mut w, &names)?;
     head.sources_start = idx;
-    idx += try!(write_slice(&mut w, &sources));
+    idx += write_slice(&mut w, &sources)?;
 
     if have_sources {
         head.source_contents_start = idx;
         head.source_contents_count = source_contents.len() as u32;
-        try!(write_slice(&mut w, &source_contents));
+        write_slice(&mut w, &source_contents)?;
     }
 
     Ok((w, head))
@@ -531,11 +531,11 @@ pub fn sourcemap_to_memdb_vec(sm: &SourceMap, opts: DumpOptions) -> Vec<u8> {
 pub fn sourcemap_to_memdb<W: Write+Seek>(sm: &SourceMap, w: W, opts: DumpOptions)
     -> Result<()>
 {
-    let (mut w, head) = try!(sourcemap_to_memdb_common(sm, w, opts));
+    let (mut w, head) = sourcemap_to_memdb_common(sm, w, opts)?;
 
     // write offsets
-    try!(w.seek(SeekFrom::Start(0)));
-    try!(write_obj(&mut w, &head));
+    w.seek(SeekFrom::Start(0))?;
+    write_obj(&mut w, &head)?;
 
     Ok(())
 }

@@ -136,7 +136,7 @@ pub unsafe extern "C" fn lsm_view_from_memdb(
 }
 
 unsafe fn load_memdb_from_path(path: &CStr) -> Result<View> {
-    View::memdb_from_path(try!(path.to_str()))
+    View::memdb_from_path(path.to_str()?)
 }
 
 #[no_mangle]
@@ -260,10 +260,10 @@ pub unsafe extern "C" fn lsm_view_dump_memdb(
     with_names: c_int, err_out: *mut CError) -> *mut u8
 {
     landingpad(|| {
-        let memdb = try!((*view).dump_memdb(DumpOptions {
+        let memdb = (*view).dump_memdb(DumpOptions {
             with_source_contents: with_source_contents != 0,
             with_names: with_names != 0,
-        }));
+        })?;
         *len_out = memdb.len() as c_uint;
         Ok(Box::into_raw(memdb.into_boxed_slice()) as *mut u8)
     }, err_out, ptr::null_mut())
@@ -317,10 +317,10 @@ pub unsafe extern "C" fn lsm_view_or_index_from_json(
     view_out: *mut *mut View, idx_out: *mut *mut Index) -> c_int
 {
     landingpad(|| {
-        match try!(ViewOrIndex::from_slice(slice::from_raw_parts(
+        match ViewOrIndex::from_slice(slice::from_raw_parts(
             bytes,
             len as usize
-        ))) {
+        ))? {
             ViewOrIndex::View(view) => {
                 *view_out = Box::into_raw(Box::new(view));
                 *idx_out = ptr::null_mut();
