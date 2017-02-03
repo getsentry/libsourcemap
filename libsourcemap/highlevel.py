@@ -16,19 +16,17 @@ Token = namedtuple('Token', ['dst_line', 'dst_col', 'src', 'src_line',
                              'src_col', 'src_id', 'name'])
 
 
-@contextmanager
-def capture_err():
+def invoke_or_fail(func, *args):
     err = _ffi.new('lsm_error_t *')
-    def check(rv):
-        if rv:
-            return rv
-        try:
-            cls = special_errors.get(err[0].code, SourceMapError)
-            exc = cls(_ffi.string(err[0].message).decode('utf-8', 'replace'))
-        finally:
-            _lib.lsm_buffer_free(err[0].message)
-        raise exc
-    yield err, check
+    rv = func(*(args + (err,)))
+    if not err[0].failed:
+        return rv
+    try:
+        cls = special_errors.get(err[0].code, SourceMapError)
+        exc = cls(_ffi.string(err[0].message).decode('utf-8', 'replace'))
+    finally:
+        _lib.lsm_buffer_free(err[0].message)
+    raise exc
 
 
 def decode_rust_str(ptr, len):
@@ -61,21 +59,20 @@ def from_json(buffer, auto_flatten=True, raise_for_index=True):
     index_out = _ffi.new('lsm_index_t **')
 
     buffer = to_bytes(buffer)
-    with capture_err() as (err_out, check):
-        rv = check(_lib.lsm_view_or_index_from_json(
-            buffer, len(buffer), err_out, view_out, index_out))
-        if rv == 1:
-            return View._from_ptr(view_out[0])
-        elif rv == 2:
-            index = Index._from_ptr(index_out[0])
-            if auto_flatten and index.can_flatten:
-                return index.into_view()
-            if raise_for_index:
-                raise IndexedSourceMap('Unexpected source map index',
-                                       index=index)
-            return index
-        else:
-            raise AssertionError('Unknown response from C ABI (%r)' % rv)
+    rv = invoke_or_fail(_lib.lsm_view_or_index_from_json,
+        buffer, len(buffer), view_out, index_out)
+    if rv == 1:
+        return View._from_ptr(view_out[0])
+    elif rv == 2:
+        index = Index._from_ptr(index_out[0])
+        if auto_flatten and index.can_flatten:
+            return index.into_view()
+        if raise_for_index:
+            raise IndexedSourceMap('Unexpected source map index',
+                                   index=index)
+        return index
+    else:
+        raise AssertionError('Unknown response from C ABI (%r)' % rv)
 
 
 class View(object):
@@ -95,25 +92,22 @@ class View(object):
     def from_json(buffer):
         """Creates a sourcemap view from a JSON string."""
         buffer = to_bytes(buffer)
-        with capture_err() as (err_out, check):
-            return View._from_ptr(check(_lib.lsm_view_from_json(
-                buffer, len(buffer), err_out)))
+        return View._from_ptr(invoke_or_fail(_lib.lsm_view_from_json,
+            buffer, len(buffer)))
 
     @staticmethod
     def from_memdb(buffer):
         """Creates a sourcemap view from MemDB bytes."""
         buffer = to_bytes(buffer)
-        with capture_err() as (err_out, check):
-            return View._from_ptr(check(_lib.lsm_view_from_memdb(
-                buffer, len(buffer), err_out)))
+        return View._from_ptr(invoke_or_fail(_lib.lsm_view_from_memdb,
+            buffer, len(buffer)))
 
     @staticmethod
     def from_memdb_file(path):
         """Creates a sourcemap view from MemDB at a given file."""
         path = to_bytes(path)
-        with capture_err() as (err_out, check):
-            return View._from_ptr(check(_lib.lsm_view_from_memdb_file(
-                path, err_out)))
+        return View._from_ptr(invoke_or_fail(_lib.lsm_view_from_memdb_file,
+            path))
 
     @staticmethod
     def _from_ptr(ptr):
@@ -129,11 +123,9 @@ class View(object):
     def dump_memdb(self, with_source_contents=True, with_names=True):
         """Dumps a sourcemap in MemDB format into bytes."""
         len_out = _ffi.new('unsigned int *')
-        with capture_err() as (err_out, check):
-            buf = check(_lib.lsm_view_dump_memdb(
-                self._get_ptr(), len_out,
-                with_source_contents, with_names,
-                err_out))
+        buf = invoke_or_fail(_lib.lsm_view_dump_memdb,
+            self._get_ptr(), len_out,
+            with_source_contents, with_names)
         try:
             rv = _ffi.unpack(buf, len_out[0])
         finally:
@@ -218,9 +210,8 @@ class Index(object):
     def from_json(buffer):
         """Creates an index from a JSON string."""
         buffer = to_bytes(buffer)
-        with capture_err() as (err_out, check):
-            return Index._from_ptr(check(_lib.lsm_index_from_json(
-                buffer, len(buffer), err_out)))
+        return Index._from_ptr(invoke_or_fail(_lib.lsm_index_from_json,
+            buffer, len(buffer)))
 
     @staticmethod
     def _from_ptr(ptr):
@@ -240,12 +231,11 @@ class Index(object):
 
     def into_view(self):
         """Converts the index into a view"""
-        with capture_err() as (err_out, check):
-            try:
-                return View._from_ptr(check(_lib.lsm_index_into_view(
-                    self._get_ptr(), err_out)))
-            finally:
-                self._ptr = None
+        try:
+            return View._from_ptr(invoke_or_fail(_lib.lsm_index_into_view,
+                self._get_ptr()))
+        finally:
+            self._ptr = None
 
     def __del__(self):
         try:

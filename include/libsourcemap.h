@@ -18,6 +18,7 @@ typedef struct lsm_token_s {
 
 typedef struct lsm_error_s {
     char *message;
+    int failed;
     int code;
 } lsm_error_t;
 
@@ -55,9 +56,9 @@ int lsm_index_can_flatten(const lsm_index_t *index);
 lsm_view_t *lsm_index_into_view(lsm_index_t *index, lsm_error_t *err);
 
 int lsm_view_or_index_from_json(char *bytes, unsigned int len,
-                                lsm_error_t *err,
                                 lsm_view_t **view_out,
-                                lsm_index_t **idx_out);
+                                lsm_index_t **idx_out,
+                                lsm_error_t *err);
 
 void lsm_buffer_free(char *buf);
 

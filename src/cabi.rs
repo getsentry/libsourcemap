@@ -30,6 +30,7 @@ pub struct Token {
 #[repr(C)]
 pub struct CError {
     pub message: *const u8,
+    pub failed: c_int,
     pub code: c_int,
 }
 
@@ -70,6 +71,7 @@ unsafe fn set_token<'a>(out: *mut Token, tm: &'a TokenMatch<'a>) {
 unsafe fn notify_err(err: Error, err_out: *mut CError) {
     if !err_out.is_null() {
         let s = format!("{}\x00", err);
+        (*err_out).failed = 1;
         (*err_out).message = Box::into_raw(s.into_boxed_str()) as *mut u8;
         (*err_out).code = get_error_code_from_kind(err.kind());
     }
@@ -313,8 +315,8 @@ pub unsafe extern "C" fn lsm_index_into_view(
 
 #[no_mangle]
 pub unsafe extern "C" fn lsm_view_or_index_from_json(
-    bytes: *const u8, len: c_uint, err_out: *mut CError,
-    view_out: *mut *mut View, idx_out: *mut *mut Index) -> c_int
+    bytes: *const u8, len: c_uint, view_out: *mut *mut View,
+    idx_out: *mut *mut Index, err_out: *mut CError) -> c_int
 {
     landingpad(|| {
         match ViewOrIndex::from_slice(slice::from_raw_parts(
