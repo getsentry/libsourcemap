@@ -1,4 +1,5 @@
 use std::ptr;
+use std::mem;
 use std::slice;
 use std::panic;
 use std::ffi::CStr;
@@ -10,25 +11,6 @@ use errors::{Error, ErrorKind, Result};
 use unified::{View, TokenMatch, Index, ViewOrIndex};
 use memdb::DumpOptions;
 
-trait GetErrorValue {
-    fn get_error_value() -> Self;
-}
-
-impl<T> GetErrorValue for *const T {
-    fn get_error_value() -> *const T { ptr::null() }
-}
-
-impl<T> GetErrorValue for *mut T {
-    fn get_error_value() -> *mut T { ptr::null_mut() }
-}
-
-impl GetErrorValue for c_int {
-    fn get_error_value() -> c_int { 0 }
-}
-
-impl GetErrorValue for c_uint {
-    fn get_error_value() -> c_uint { 0 }
-}
 
 fn resultbox<T>(val: T) -> Result<*mut T> {
     Ok(Box::into_raw(Box::new(val)))
@@ -101,26 +83,21 @@ unsafe fn notify_err(err: Error, err_out: *mut CError) {
     }
 }
 
-unsafe fn landingpad<F: FnOnce() -> Result<T> + panic::UnwindSafe, T: GetErrorValue>(
+unsafe fn landingpad<F: FnOnce() -> Result<T> + panic::UnwindSafe, T>(
     f: F, err_out: *mut CError) -> T
 {
-    match panic::catch_unwind(f) {
-        Ok(rv) => {
-            rv.map_err(|err| notify_err(err, err_out)).unwrap_or(T::get_error_value())
-        }
-        Err(_) => {
-            notify_err(ErrorKind::InternalError.into(), err_out);
-            T::get_error_value()
-        }
+    if let Ok(rv) = panic::catch_unwind(f) {
+        rv.map_err(|err| notify_err(err, err_out)).unwrap_or(mem::zeroed())
+    } else {
+        notify_err(ErrorKind::InternalError.into(), err_out);
+        mem::zeroed()
     }
 }
 
 macro_rules! export (
     (
-        $(#[$attr:meta])*
         $name:ident($($aname:ident: $aty:ty),*) -> Result<$rv:ty> $body:block
     ) => (
-        $(#[$attr])*
         #[no_mangle]
         pub unsafe extern "C" fn $name($($aname: $aty,)* err_out: *mut CError) -> $rv
         {
@@ -128,10 +105,8 @@ macro_rules! export (
         }
     );
     (
-        $(#[$attr:meta])*
         $name:ident($($aname:ident: $aty:ty),*) $body:block
     ) => {
-        $(#[$attr])*
         #[no_mangle]
         pub unsafe extern "C" fn $name($($aname: $aty,)*)
         {
