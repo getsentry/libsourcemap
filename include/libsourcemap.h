@@ -22,28 +22,33 @@ typedef struct lsm_error_s {
     int code;
 } lsm_error_t;
 
-void lsm_init(void);
+int lsm_init(lsm_error_t *err);
 
 lsm_view_t *lsm_view_from_json(char *bytes, unsigned int len, lsm_error_t *err);
 lsm_view_t *lsm_view_from_memdb(char *bytes, unsigned int len, lsm_error_t *err);
 lsm_view_t *lsm_view_from_memdb_file(char *path, lsm_error_t *err);
-void lsm_view_free(lsm_view_t *view);
+void lsm_view_free(lsm_view_t *view, lsm_error_t *err);
 
-unsigned int lsm_view_get_token_count(const lsm_view_t *view);
+unsigned int lsm_view_get_token_count(const lsm_view_t *view, lsm_error_t *err);
 unsigned int lsm_view_get_token(const lsm_view_t *view, unsigned int idx,
-                                lsm_token_t *tok_out);
+                                lsm_token_t *tok_out, lsm_error_t *err);
 int lsm_view_lookup_token(const lsm_view_t *view, unsigned int line,
-                          unsigned int col, lsm_token_t *tok_out);
-unsigned int lsm_view_get_source_count(const lsm_view_t *view);
+                          unsigned int col, lsm_token_t *tok_out,
+                          lsm_error_t *err);
+unsigned int lsm_view_get_source_count(const lsm_view_t *view,\
+                                       lsm_error_t *err);
 char *lsm_view_get_source_contents(const lsm_view_t *view,
                                    unsigned int src_id,
                                    unsigned int *len_out,
-                                   int *must_free);
+                                   int *must_free,
+                                   lsm_error_t *err);
 const char *lsm_view_get_source_name(const lsm_view_t *view,
                                      unsigned int src_id,
-                                     unsigned int *len_out);
+                                     unsigned int *len_out,
+                                     lsm_error_t *err);
 int lsm_view_has_source_contents(const lsm_view_t *view,
-                                 unsigned int src_id);
+                                 unsigned int src_id,
+                                 lsm_error_t *err);
 char *lsm_view_dump_memdb(const lsm_view_t *view,
                           unsigned int *len_out,
                           int with_source_contents,
@@ -52,7 +57,7 @@ char *lsm_view_dump_memdb(const lsm_view_t *view,
 
 lsm_index_t *lsm_index_from_json(char *bytes, unsigned int len, lsm_error_t *err);
 void lsm_index_free(lsm_index_t *index);
-int lsm_index_can_flatten(const lsm_index_t *index);
+int lsm_index_can_flatten(const lsm_index_t *index, lsm_error_t *err);
 lsm_view_t *lsm_index_into_view(lsm_index_t *index, lsm_error_t *err);
 
 int lsm_view_or_index_from_json(char *bytes, unsigned int len,

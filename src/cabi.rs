@@ -10,6 +10,30 @@ use errors::{Error, ErrorKind, Result};
 use unified::{View, TokenMatch, Index, ViewOrIndex};
 use memdb::DumpOptions;
 
+trait GetErrorValue {
+    fn get_error_value() -> Self;
+}
+
+impl<T> GetErrorValue for *const T {
+    fn get_error_value() -> *const T { ptr::null() }
+}
+
+impl<T> GetErrorValue for *mut T {
+    fn get_error_value() -> *mut T { ptr::null_mut() }
+}
+
+impl GetErrorValue for c_int {
+    fn get_error_value() -> c_int { 0 }
+}
+
+impl GetErrorValue for c_uint {
+    fn get_error_value() -> c_uint { 0 }
+}
+
+fn resultbox<T>(val: T) -> Result<*mut T> {
+    Ok(Box::into_raw(Box::new(val)))
+}
+
 
 #[derive(Debug)]
 #[repr(C)]
@@ -77,262 +101,199 @@ unsafe fn notify_err(err: Error, err_out: *mut CError) {
     }
 }
 
-unsafe fn landingpad<F: FnOnce() -> Result<T> + panic::UnwindSafe, T>(
-    f: F, err_out: *mut CError, err_rv: T) -> T
+unsafe fn landingpad<F: FnOnce() -> Result<T> + panic::UnwindSafe, T: GetErrorValue>(
+    f: F, err_out: *mut CError) -> T
 {
     match panic::catch_unwind(f) {
         Ok(rv) => {
-            rv.map_err(|err| notify_err(err, err_out)).unwrap_or(err_rv)
+            rv.map_err(|err| notify_err(err, err_out)).unwrap_or(T::get_error_value())
         }
         Err(_) => {
             notify_err(ErrorKind::InternalError.into(), err_out);
-            err_rv
+            T::get_error_value()
         }
     }
 }
 
-unsafe fn boxed_landingpad<F: FnOnce() -> Result<T>, T>(
-    f: F, err_out: *mut CError) -> *mut T
-    where F: panic::UnwindSafe
-{
-    landingpad(|| match f() {
-        Ok(v) => Ok(Box::into_raw(Box::new(v))),
-        Err(err) => Err(err),
-    }, err_out, ptr::null_mut())
-}
+macro_rules! export (
+    (
+        $(#[$attr:meta])*
+        $name:ident($($aname:ident: $aty:ty),*) -> Result<$rv:ty> $body:block
+    ) => (
+        $(#[$attr])*
+        #[no_mangle]
+        pub unsafe extern "C" fn $name($($aname: $aty,)* err_out: *mut CError) -> $rv
+        {
+            landingpad(|| $body, err_out)
+        }
+    );
+    (
+        $(#[$attr:meta])*
+        $name:ident($($aname:ident: $aty:ty),*) $body:block
+    ) => {
+        $(#[$attr])*
+        #[no_mangle]
+        pub unsafe extern "C" fn $name($($aname: $aty,)*)
+        {
+            // this silences panics and stuff
+            landingpad(|| { $body; Ok(0 as c_int)}, ptr::null_mut());
+        }
+    }
+);
 
-fn silent_panic_handler(_pi: &panic::PanicInfo) {
-    // don't do anything here.  This disables the default printing of
-    // panics to stderr which we really don't care about here.
-}
-
-
-#[no_mangle]
-pub unsafe extern "C" fn lsm_init() {
+export!(lsm_init() {
+    fn silent_panic_handler(_pi: &panic::PanicInfo) {
+        // don't do anything here.  This disables the default printing of
+        // panics to stderr which we really don't care about here.
+    }
     panic::set_hook(Box::new(silent_panic_handler));
-}
+});
 
-#[no_mangle]
-pub unsafe extern "C" fn lsm_view_from_json(
-    bytes: *const u8, len: c_uint, err_out: *mut CError) -> *mut View
-{
-    boxed_landingpad(|| {
-        View::json_from_slice(slice::from_raw_parts(
-            bytes,
-            len as usize
-        ))
-    }, err_out)
-}
+export!(lsm_view_from_json(bytes: *const u8, len: c_uint) -> Result<*mut View> {
+    resultbox(View::json_from_slice(slice::from_raw_parts(bytes, len as usize))?)
+});
 
-#[no_mangle]
-pub unsafe extern "C" fn lsm_view_from_memdb(
-    bytes: *const u8, len: c_uint, err_out: *mut CError) -> *mut View
+export!(lsm_view_from_memdb(
+    bytes: *const u8, len: c_uint) -> Result<*mut View>
 {
     // XXX: this currently copies because that's safer.  Consider improving this?
-    boxed_landingpad(|| {
-        View::memdb_from_vec(slice::from_raw_parts(
-            bytes,
-            len as usize
-        ).to_vec())
-    }, err_out)
-}
+    resultbox(View::memdb_from_vec(slice::from_raw_parts(
+        bytes,
+        len as usize
+    ).to_vec())?)
+});
 
-unsafe fn load_memdb_from_path(path: &CStr) -> Result<View> {
-    View::memdb_from_path(path.to_str()?)
-}
+export!(lsm_view_from_memdb_file(path: *const c_char) -> Result<*mut View> {
+    resultbox(View::memdb_from_path(CStr::from_ptr(path).to_str()?)?)
+});
 
-#[no_mangle]
-pub unsafe extern "C" fn lsm_view_from_memdb_file(
-    path: *const c_char, err_out: *mut CError) -> *mut View
-{
-    boxed_landingpad(|| {
-        load_memdb_from_path(CStr::from_ptr(path))
-    }, err_out)
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn lsm_view_free(view: *mut View) {
+export!(lsm_view_free(view: *mut View) {
     if !view.is_null() {
         Box::from_raw(view);
     }
-}
+});
 
-#[no_mangle]
-pub unsafe extern "C" fn lsm_view_get_token_count(
-    view: *const View) -> c_uint
-{
-    // XXX: this silences panics
-    panic::catch_unwind(|| (*view).get_token_count() as c_uint).unwrap_or(0)
-}
+export!(lsm_view_get_token_count(view: *const View) -> Result<c_uint> {
+    Ok((*view).get_token_count() as c_uint)
+});
 
-#[no_mangle]
-pub unsafe extern "C" fn lsm_view_get_token(
-    view: *const View, idx: c_uint, out: *mut Token)
--> c_int
-{
-    // XXX: this silences panics
-    panic::catch_unwind(|| {
-        match (*view).get_token(idx as u32) {
-            None => 0,
-            Some(tm) => {
-                set_token(out, &tm);
-                1
-            }
+export!(lsm_view_get_token(view: *const View, idx: c_uint, out: *mut Token) -> Result<c_int> {
+    Ok(match (*view).get_token(idx as u32) {
+        None => 0,
+        Some(tm) => {
+            set_token(out, &tm);
+            1
         }
-    }).unwrap_or(0)
-}
+    })
+});
 
-#[no_mangle]
-pub unsafe extern "C" fn lsm_view_lookup_token(
-    view: *const View, line: c_uint, col: c_uint, out: *mut Token) -> c_int
+export!(lsm_view_lookup_token(
+        view: *const View, line: c_uint, col: c_uint, out: *mut Token) -> Result<c_int>
 {
-    // XXX: this silences panics
-    panic::catch_unwind(|| {
-        match (*view).lookup_token(line, col) {
-            None => 0,
-            Some(tm) => {
-                set_token(out, &tm);
-                1
-            }
+    Ok(match (*view).lookup_token(line, col) {
+        None => 0,
+        Some(tm) => {
+            set_token(out, &tm);
+            1
         }
-    }).unwrap_or(0)
-}
+    })
+});
 
-#[no_mangle]
-pub unsafe extern "C" fn lsm_view_get_source_count(
-    view: *const View) -> c_uint
-{
-    (*view).get_source_count() as c_uint
-}
+export!(lsm_view_get_source_count(view: *const View) -> Result<c_uint> {
+    Ok((*view).get_source_count() as c_uint)
+});
 
-#[no_mangle]
-pub unsafe extern "C" fn lsm_view_has_source_contents(
-    view: *const View, src_id: c_uint) -> c_int
-{
-    // XXX: this silences panics
-    panic::catch_unwind(|| {
-        if (*view).get_source_contents(src_id as u32).is_some() { 1 } else { 0 }
-    }).unwrap_or(0)
-}
+export!(lsm_view_has_source_contents(view: *const View, src_id: c_uint) -> Result<c_int> {
+    Ok(if (*view).get_source_contents(src_id as u32).is_some() { 1 } else { 0 })
+});
 
-#[no_mangle]
-pub unsafe extern "C" fn lsm_view_get_source_contents(
+export!(lsm_view_get_source_contents(
     view: *const View, src_id: c_uint, len_out: *mut c_uint,
-    must_free: *mut c_int) -> *const u8
+    must_free: *mut c_int) -> Result<*mut u8>
 {
     *must_free = 0;
-
-    // XXX: this silences panics
-    panic::catch_unwind(|| {
-        match (*view).get_source_contents(src_id as u32) {
-            None => ptr::null_mut(),
-            Some(contents) => {
-                *len_out = contents.len() as c_uint;
-                match contents {
-                    Cow::Borrowed(s) => s.as_ptr() as *mut u8,
-                    Cow::Owned(val) => {
-                        *must_free = 1;
-                        Box::into_raw(val.into_boxed_str()) as *mut u8
-                    }
+    Ok(match (*view).get_source_contents(src_id as u32) {
+        None => ptr::null_mut(),
+        Some(contents) => {
+            *len_out = contents.len() as c_uint;
+            match contents {
+                Cow::Borrowed(s) => s.as_ptr() as *mut u8,
+                Cow::Owned(val) => {
+                    *must_free = 1;
+                    Box::into_raw(val.into_boxed_str()) as *mut u8
                 }
             }
         }
-    }).unwrap_or(ptr::null_mut())
-}
+    })
+});
 
-#[no_mangle]
-pub unsafe extern "C" fn lsm_view_get_source_name(
-    view: *const View, src_id: c_uint, len_out: *mut c_uint) -> *const u8
+export!(lsm_view_get_source_name(
+    view: *const View, src_id: c_uint, len_out: *mut c_uint) -> Result<*const u8>
 {
-    // XXX: this silences panics
-    panic::catch_unwind(|| {
-        match (*view).get_source(src_id as u32) {
-            None => ptr::null(),
-            Some(name) => {
-                *len_out = name.len() as c_uint;
-                name.as_ptr()
-            }
+    Ok(match (*view).get_source(src_id as u32) {
+        None => ptr::null(),
+        Some(name) => {
+            *len_out = name.len() as c_uint;
+            name.as_ptr()
         }
-    }).unwrap_or(ptr::null())
-}
+    })
+});
 
-#[no_mangle]
-pub unsafe extern "C" fn lsm_view_dump_memdb(
+export!(lsm_view_dump_memdb(
     view: *mut View, len_out: *mut c_uint, with_source_contents: c_int,
-    with_names: c_int, err_out: *mut CError) -> *mut u8
+    with_names: c_int) -> Result<*mut u8>
 {
-    landingpad(|| {
-        let memdb = (*view).dump_memdb(DumpOptions {
-            with_source_contents: with_source_contents != 0,
-            with_names: with_names != 0,
-        })?;
-        *len_out = memdb.len() as c_uint;
-        Ok(Box::into_raw(memdb.into_boxed_slice()) as *mut u8)
-    }, err_out, ptr::null_mut())
-}
+    let memdb = (*view).dump_memdb(DumpOptions {
+        with_source_contents: with_source_contents != 0,
+        with_names: with_names != 0,
+    })?;
+    *len_out = memdb.len() as c_uint;
+    Ok(Box::into_raw(memdb.into_boxed_slice()) as *mut u8)
+});
 
-#[no_mangle]
-pub unsafe extern "C" fn lsm_buffer_free(buf: *mut u8) {
+export!(lsm_buffer_free(buf: *mut u8) {
     if !buf.is_null() {
         Box::from_raw(buf);
     }
-}
+});
 
-#[no_mangle]
-pub unsafe extern "C" fn lsm_index_from_json(
-    bytes: *const u8, len: c_uint, err_out: *mut CError) -> *mut Index
-{
-    boxed_landingpad(|| {
-        Index::json_from_slice(slice::from_raw_parts(
-            bytes,
-            len as usize
-        ))
-    }, err_out)
-}
+export!(lsm_index_from_json(bytes: *const u8, len: c_uint) -> Result<*mut Index> {
+    resultbox(Index::json_from_slice(slice::from_raw_parts(
+        bytes,
+        len as usize
+    ))?)
+});
 
-#[no_mangle]
-pub unsafe extern "C" fn lsm_index_free(idx: *mut Index) {
+export!(lsm_index_free(idx: *mut Index) {
     if !idx.is_null() {
         Box::from_raw(idx);
     }
-}
+});
 
-#[no_mangle]
-pub unsafe extern "C" fn lsm_index_can_flatten(idx: *const Index) -> c_int {
-    panic::catch_unwind(|| {
-        if (*idx).can_flatten() { 1 } else { 0 }
-    }).unwrap_or(0)
-}
+export!(lsm_index_can_flatten(idx: *const Index) -> Result<c_int> {
+    Ok(if (*idx).can_flatten() { 1 } else { 0 })
+});
 
-#[no_mangle]
-pub unsafe extern "C" fn lsm_index_into_view(
-    idx: *mut Index, err_out: *mut CError) -> *mut View
-{
-    boxed_landingpad(|| {
-        Box::from_raw(idx).into_view()
-    }, err_out)
-}
+export!(lsm_index_into_view(idx: *mut Index) -> Result<*mut View> {
+    resultbox(Box::from_raw(idx).into_view()?)
+});
 
-#[no_mangle]
-pub unsafe extern "C" fn lsm_view_or_index_from_json(
+export!(lsm_view_or_index_from_json(
     bytes: *const u8, len: c_uint, view_out: *mut *mut View,
-    idx_out: *mut *mut Index, err_out: *mut CError) -> c_int
-{
-    landingpad(|| {
-        match ViewOrIndex::from_slice(slice::from_raw_parts(
-            bytes,
-            len as usize
-        ))? {
-            ViewOrIndex::View(view) => {
-                *view_out = Box::into_raw(Box::new(view));
-                *idx_out = ptr::null_mut();
-                Ok(1)
-            }
-            ViewOrIndex::Index(idx) => {
-                *view_out = ptr::null_mut();
-                *idx_out = Box::into_raw(Box::new(idx));
-                Ok(2)
-            }
+    idx_out: *mut *mut Index) -> Result<c_int> {
+    match ViewOrIndex::from_slice(slice::from_raw_parts(
+        bytes,
+        len as usize
+    ))? {
+        ViewOrIndex::View(view) => {
+            *view_out = Box::into_raw(Box::new(view));
+            *idx_out = ptr::null_mut();
+            Ok(1)
         }
-    }, err_out, 0)
-}
+        ViewOrIndex::Index(idx) => {
+            *view_out = ptr::null_mut();
+            *idx_out = Box::into_raw(Box::new(idx));
+            Ok(2)
+        }
+    }
+});

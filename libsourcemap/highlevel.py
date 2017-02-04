@@ -9,14 +9,13 @@ from .exceptions import SourceMapError, IndexedSourceMap, special_errors
 
 
 _lib = _ffi.dlopen(os.path.join(os.path.dirname(__file__), '_libsourcemap.so'))
-_lib.lsm_init()
 
 
 Token = namedtuple('Token', ['dst_line', 'dst_col', 'src', 'src_line',
                              'src_col', 'src_id', 'name'])
 
 
-def invoke_or_fail(func, *args):
+def rustcall(func, *args):
     err = _ffi.new('lsm_error_t *')
     rv = func(*(args + (err,)))
     if not err[0].failed:
@@ -27,6 +26,9 @@ def invoke_or_fail(func, *args):
     finally:
         _lib.lsm_buffer_free(err[0].message)
     raise exc
+
+
+rustcall(_lib.lsm_init)
 
 
 def decode_rust_str(ptr, len):
@@ -59,7 +61,7 @@ def from_json(buffer, auto_flatten=True, raise_for_index=True):
     index_out = _ffi.new('lsm_index_t **')
 
     buffer = to_bytes(buffer)
-    rv = invoke_or_fail(_lib.lsm_view_or_index_from_json,
+    rv = rustcall(_lib.lsm_view_or_index_from_json,
         buffer, len(buffer), view_out, index_out)
     if rv == 1:
         return View._from_ptr(view_out[0])
@@ -92,22 +94,21 @@ class View(object):
     def from_json(buffer):
         """Creates a sourcemap view from a JSON string."""
         buffer = to_bytes(buffer)
-        return View._from_ptr(invoke_or_fail(_lib.lsm_view_from_json,
+        return View._from_ptr(rustcall(_lib.lsm_view_from_json,
             buffer, len(buffer)))
 
     @staticmethod
     def from_memdb(buffer):
         """Creates a sourcemap view from MemDB bytes."""
         buffer = to_bytes(buffer)
-        return View._from_ptr(invoke_or_fail(_lib.lsm_view_from_memdb,
+        return View._from_ptr(rustcall(_lib.lsm_view_from_memdb,
             buffer, len(buffer)))
 
     @staticmethod
     def from_memdb_file(path):
         """Creates a sourcemap view from MemDB at a given file."""
         path = to_bytes(path)
-        return View._from_ptr(invoke_or_fail(_lib.lsm_view_from_memdb_file,
-            path))
+        return View._from_ptr(rustcall(_lib.lsm_view_from_memdb_file, path))
 
     @staticmethod
     def _from_ptr(ptr):
@@ -123,7 +124,7 @@ class View(object):
     def dump_memdb(self, with_source_contents=True, with_names=True):
         """Dumps a sourcemap in MemDB format into bytes."""
         len_out = _ffi.new('unsigned int *')
-        buf = invoke_or_fail(_lib.lsm_view_dump_memdb,
+        buf = rustcall(_lib.lsm_view_dump_memdb,
             self._get_ptr(), len_out,
             with_source_contents, with_names)
         try:
@@ -140,7 +141,8 @@ class View(object):
         if line < 0 or col < 0:
             return None
         tok_out = _ffi.new('lsm_token_t *')
-        if _lib.lsm_view_lookup_token(self._get_ptr(), line, col, tok_out):
+        if rustcall(_lib.lsm_view_lookup_token, self._get_ptr(),
+                    line, col, tok_out):
             return convert_token(tok_out[0])
 
     def get_source_contents(self, src_id):
@@ -149,8 +151,8 @@ class View(object):
         """
         len_out = _ffi.new('unsigned int *')
         must_free = _ffi.new('int *')
-        rv = _lib.lsm_view_get_source_contents(self._get_ptr(), src_id,
-                                               len_out, must_free)
+        rv = rustcall(_lib.lsm_view_get_source_contents,
+                      self._get_ptr(), src_id, len_out, must_free)
         if rv:
             try:
                 return _ffi.unpack(rv, len_out[0])
@@ -160,18 +162,21 @@ class View(object):
 
     def has_source_contents(self, src_id):
         """Checks if some sources exist."""
-        return bool(_lib.lsm_view_has_source_contents(self._get_ptr(), src_id))
+        return bool(rustcall(_lib.lsm_view_has_source_contents,
+                             self._get_ptr(), src_id))
 
     def get_source_name(self, src_id):
         """Returns the name of the given source."""
         len_out = _ffi.new('unsigned int *')
-        rv = _lib.lsm_view_get_source_name(self._get_ptr(), src_id, len_out)
+        rv = rustcall(_lib.lsm_view_get_source_name,
+                      self._get_ptr(), src_id, len_out)
         if rv:
             return decode_rust_str(rv, len_out[0])
 
     def get_source_count(self):
         """Returns the number of sources."""
-        return _lib.lsm_view_get_source_count(self._get_ptr())
+        return rustcall(_lib.lsm_view_get_source_count,
+                        self._get_ptr())
 
     def iter_sources(self):
         """Iterates over all source names and IDs."""
@@ -181,12 +186,12 @@ class View(object):
     def __getitem__(self, idx):
         """Returns a token with a given index."""
         tok_out = _ffi.new('lsm_token_t *')
-        if _lib.lsm_view_get_token(self._get_ptr(), idx, tok_out):
+        if rustcall(_lib.lsm_view_get_token, self._get_ptr(), idx, tok_out):
             return convert_token(tok_out[0])
         raise IndexError(idx)
 
     def __len__(self):
-        return _lib.lsm_view_get_token_count(self._get_ptr())
+        return rustcall(_lib.lsm_view_get_token_count, self._get_ptr())
 
     def __iter__(self):
         for idx in xrange(len(self)):
@@ -210,7 +215,7 @@ class Index(object):
     def from_json(buffer):
         """Creates an index from a JSON string."""
         buffer = to_bytes(buffer)
-        return Index._from_ptr(invoke_or_fail(_lib.lsm_index_from_json,
+        return Index._from_ptr(rustcall(_lib.lsm_index_from_json,
             buffer, len(buffer)))
 
     @staticmethod
@@ -227,12 +232,12 @@ class Index(object):
     @property
     def can_flatten(self):
         """True if the index does not contain external references."""
-        return _lib.lsm_index_can_flatten(self._get_ptr()) == 1
+        return rustcall(_lib.lsm_index_can_flatten, self._get_ptr()) == 1
 
     def into_view(self):
         """Converts the index into a view"""
         try:
-            return View._from_ptr(invoke_or_fail(_lib.lsm_index_into_view,
+            return View._from_ptr(rustcall(_lib.lsm_index_into_view,
                 self._get_ptr()))
         finally:
             self._ptr = None
