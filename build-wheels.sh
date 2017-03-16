@@ -33,6 +33,12 @@ if [ `uname` == "Darwin" ]; then
   WHEEL_OPTIONS="--plat-name=macosx-10.9-intel"
 fi
 
+# Are we running a RHEL/CENTOS clone?
+# If so grab the version number
+if [ -f /etc/redhat-release ]; then
+  osver=`cat /etc/redhat-release | awk '{print $4}' | cut -c 1-3`
+fi
+
 # Since we do not link against libpython we can just use any of the Pythons
 # on the system to generate a while (UCS2/UCS4 does not matter).  The dockerfile
 # enables one of them already so we go with that.
@@ -75,6 +81,12 @@ elif [ x$LIBSOURCEMAP_MACWHEELS == x1 ]; then
 
 # Otherwise just build with the normal python and embrace it.
 else
+  # If we are running RHEL/CENTOS 7.3 then we must use GCC
+  # CLAG 3.4 has issues with fstack-protector-strong
+  if [ $osver == "7.3" ]; then
+    export LIBSOURCEMAP_MANYLINUX=1
+  fi
+
   pip install wheel
   python setup.py bdist_wheel $WHEEL_OPTIONS
 fi
