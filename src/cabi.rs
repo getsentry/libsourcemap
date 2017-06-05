@@ -6,6 +6,7 @@ use std::ffi::CStr;
 use std::borrow::Cow;
 use std::os::raw::{c_int, c_uint, c_char};
 
+use proguard::MappingView;
 use sourcemap::Error as SourceMapError;
 use errors::{Error, ErrorKind, Result};
 use unified::{View, TokenMatch, Index, ViewOrIndex};
@@ -42,11 +43,11 @@ pub struct CError {
 
 fn get_error_code_from_kind(kind: &ErrorKind) -> c_int {
     match *kind {
-        ErrorKind::SourceMapError(SourceMapError::IndexedSourcemap) => 2,
-        ErrorKind::SourceMapError(SourceMapError::BadJson(_, _, _)) => 3,
-        ErrorKind::SourceMapError(SourceMapError::CannotFlatten(_)) => 4,
+        ErrorKind::SourceMap(SourceMapError::IndexedSourcemap) => 2,
+        ErrorKind::SourceMap(SourceMapError::BadJson(_, _, _)) => 3,
+        ErrorKind::SourceMap(SourceMapError::CannotFlatten(_)) => 4,
         ErrorKind::UnsupportedMemDbVersion => 5,
-        ErrorKind::IoError(_) => 6,
+        ErrorKind::Io(_) => 6,
         ErrorKind::TooManySources => 20,
         ErrorKind::TooManyNames => 21,
         ErrorKind::LocationOverflow => 22,
@@ -271,4 +272,56 @@ export!(lsm_view_or_index_from_json(
             Ok(2)
         }
     }
+});
+
+export!(lsm_proguard_mapping_from_bytes(bytes: *const u8, len: c_uint)
+    -> Result<*mut MappingView<'static>>
+{
+    resultbox(MappingView::from_slice(slice::from_raw_parts(bytes, len as usize))?)
+});
+
+export!(lsm_proguard_mapping_free(view: *mut MappingView) {
+    if !view.is_null() {
+        Box::from_raw(view);
+    }
+});
+
+export!(lsm_proguard_mapping_has_line_info(view: *const MappingView) -> Result<c_int> {
+    Ok(if (*view).has_line_info() {
+        1
+    } else {
+        0
+    })
+});
+
+export!(lsm_proguard_mapping_convert_dotted_path(
+    view: *const MappingView, path: *const c_char, lineno: c_int)
+    -> Result<*mut u8>
+{
+    let path = CStr::from_ptr(path).to_str()?;
+    let mut iter = path.splitn(2, ':');
+    let cls_name = iter.next().unwrap_or("");
+    let meth_name = iter.next();
+
+    let s = if let Some(cls) = (*view).find_class(cls_name) {
+        let class_name = cls.class_name();
+        if let Some(meth_name) = meth_name {
+            let methods = cls.get_methods(meth_name, if lineno == 0 {
+                None
+            } else {
+                Some(lineno as u32)
+            });
+            if !methods.is_empty() {
+                format!("{}:{}\x00", class_name, methods[0].name())
+            } else {
+                format!("{}:{}\x00", class_name, meth_name)
+            }
+        } else {
+            format!("{}\x00", class_name)
+        }
+    } else {
+        format!("{}\x00", path)
+    };
+
+    Ok(Box::into_raw(s.into_boxed_str()) as *mut u8)
 });

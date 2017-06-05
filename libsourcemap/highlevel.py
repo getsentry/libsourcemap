@@ -249,3 +249,52 @@ class Index(object):
             self._ptr = None
         except Exception:
             pass
+
+
+class ProguardView(object):
+
+    def __init__(self):
+        raise TypeError('Cannot instanciate proguard views')
+
+    def _get_ptr(self):
+        if not self._ptr:
+            raise RuntimeError('View is closed')
+        return self._ptr
+
+    @staticmethod
+    def from_bytes(buffer):
+        """Creates a sourcemap view from a JSON string."""
+        buffer = to_bytes(buffer)
+        return View._from_ptr(rustcall(_lib.lsm_proguard_mapping_from_bytes,
+            buffer, len(buffer)))
+
+    @property
+    def has_line_info(self):
+        """Returns true if the file has line information."""
+        return bool(rustcall(
+            _lib.lsm_proguard_mapping_has_line_info, self._get_ptr()))
+
+    def lookup(self, dotted_path, lineno=None):
+        rv = None
+        try:
+            rv = rustcall(
+                _lib.lsm_proguard_mapping_convert_dotted_path,
+                dotted_path.encode('utf-8'), lineno or 0)
+            return _ffi.string(rv).decode('utf-8', 'replace')
+        finally:
+            if rv is not None:
+                _lib.lsm_buffer_free(rv)
+
+    @staticmethod
+    def _from_ptr(ptr):
+        rv = object.__new__(View)
+        rv._ptr = ptr
+        return rv
+
+    def __del__(self):
+        try:
+            if self._ptr:
+                _lib.lsm_proguard_mapping_free(self._ptr)
+            self._ptr = None
+        except Exception:
+            pass
