@@ -276,6 +276,11 @@ class ProguardView(object):
             _lib.lsm_proguard_mapping_has_line_info, self._get_ptr()))
 
     def lookup(self, dotted_path, lineno=None):
+        """Given a dotted path in the format ``class_name`` or
+        ``class_name:method_name`` this performs an alias lookup.  For
+        methods the line number must be supplied or the result is
+        unreliaable.
+        """
         rv = None
         try:
             rv = rustcall(
