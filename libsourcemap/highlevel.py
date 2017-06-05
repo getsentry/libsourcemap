@@ -265,7 +265,8 @@ class ProguardView(object):
     def from_bytes(buffer):
         """Creates a sourcemap view from a JSON string."""
         buffer = to_bytes(buffer)
-        return View._from_ptr(rustcall(_lib.lsm_proguard_mapping_from_bytes,
+        return ProguardView._from_ptr(rustcall(
+            _lib.lsm_proguard_mapping_from_bytes,
             buffer, len(buffer)))
 
     @property
@@ -279,6 +280,7 @@ class ProguardView(object):
         try:
             rv = rustcall(
                 _lib.lsm_proguard_mapping_convert_dotted_path,
+                self._get_ptr(),
                 dotted_path.encode('utf-8'), lineno or 0)
             return _ffi.string(rv).decode('utf-8', 'replace')
         finally:
@@ -287,7 +289,7 @@ class ProguardView(object):
 
     @staticmethod
     def _from_ptr(ptr):
-        rv = object.__new__(View)
+        rv = object.__new__(ProguardView)
         rv._ptr = ptr
         return rv
 

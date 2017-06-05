@@ -66,11 +66,11 @@ int lsm_view_or_index_from_json(char *bytes, unsigned int len,
                                 lsm_index_t **idx_out,
                                 lsm_error_t *err);
 
-lsm_proguard_mapping_t *lsm_proguard_mapping_from_bytes(char *bytes, size_t len);
+lsm_proguard_mapping_t *lsm_proguard_mapping_from_bytes(char *bytes, size_t len, lsm_error_t *err);
 void lsm_proguard_mapping_free(lsm_proguard_mapping_t *view);
-int lsm_proguard_mapping_has_line_info(lsm_proguard_mapping_t *view);
+int lsm_proguard_mapping_has_line_info(lsm_proguard_mapping_t *view, lsm_error_t *err);
 char *lsm_proguard_mapping_convert_dotted_path(
-    lsm_proguard_mapping_t *view, const char *path, int lineno);
+    lsm_proguard_mapping_t *view, const char *path, int lineno, lsm_error_t *err);
 
 void lsm_buffer_free(char *buf);
 
