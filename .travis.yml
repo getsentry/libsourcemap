@@ -25,16 +25,3 @@ install:
 - make develop
 
 script: make test
-
-jobs:
-  include:
-  - stage: build-wheels
-    script: make manylinux-wheels
-    deploy:
-      provider: pypi
-      username: getsentry
-      password:
-        secure: RhG2mQBIG30sO7Zha8SqZFuqWNYFMal8Z1n1vEDmIT1/+5EWTGTm7Ivq7QyQjD/KOCaVBT1GKmUwcu4eXEt+oHlarzsqYRz2sJNJJVJXqUQVVDGMouS6EULa0qi/8dO5VZ0MESg9PlXwIaAy80CHjwCMZ2gcjaoeVMOoIYPKUIeGOnIPsMst1Q9/YGvHwUK2hBKIfiOQvVQZ0nWnVfQ/4YOcZtKxco4S6H7qQM2AQzGBdt+tDch9JvVJ1Y+g7pc5Cn1mjAPDEWSp63fdLlIFveWZQt+i3uNoLgfyYbtrigaVvCjdPZQiny8SCfi4I4xkMvVpE1o6eaqIPreSmeF62xtkZ1eN1au8BxUyaY5tU0W50M7iIsJiXYNaUCOKrd8iy9xo0fzClpkiEuRAUu0HFIMYMSCyPHHwYBUAUOKWMXGxTt+iso4IXlfFkl/w71Ahs3b4lc0lG1Qe/oUDiqobJ4cm9lmXeyYi6Q7xjEGMyFEe3IQu2cCX0XW1RnD8LvTMEmvlU6lw6BL1CELaMNgiks3txENURB/MBEc0+85wgmIKVeOrseJz0BpXL/UY+n9BSnzJZ7sj/+oGC6ckP24LTLEhUriyUo5o6PvaazYUqSvpPh8DAHeyq4UTsf2dusDairgARDFS0w71IN83BZXUZQy0V/pugzrBTtD1XlZWwvQ=
-      on:
-        tags: true
-      skip_cleanup: true
