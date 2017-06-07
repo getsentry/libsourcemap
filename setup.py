@@ -56,14 +56,6 @@ class CustomBuildExt(build_ext):
             build_libsourcemap(build_py.get_package_dir(PACKAGE))
 
 
-class BinaryDistribution(Distribution):
-    """This is necessary because otherwise the wheel does not know that
-    we have non pure information.
-    """
-    def has_ext_modules(foo):
-        return True
-
-
 cmdclass = {
     'build_ext': CustomBuildExt,
     'build_py': CustomBuildPy,
@@ -76,9 +68,10 @@ cmdclass = {
 # be an API to do that, we just patch the internal function that wheel uses.
 if bdist_wheel is not None:
     class CustomBdistWheel(bdist_wheel):
-        def get_tag(self):
-            rv = bdist_wheel.get_tag(self)
-            return ('py2.py3', 'none') + rv[2:]
+        def finalize_options(self):
+            bdist_wheel.finalize_options(self)
+            self.python_tag = 'py2.py3'
+            self.root_is_pure = False
     cmdclass['bdist_wheel'] = CustomBdistWheel
 
 
@@ -110,6 +103,4 @@ setup(
         'Topic :: Internet :: WWW/HTTP :: Dynamic Content',
         'Topic :: Software Development :: Libraries :: Python Modules'
     ],
-    ext_modules=[],
-    distclass=BinaryDistribution
 )
