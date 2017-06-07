@@ -88,7 +88,7 @@ class View(object):
     """
 
     def __init__(self):
-        raise TypeError('Cannot instanciate views')
+        raise TypeError('Cannot instantiate views')
 
     @staticmethod
     def from_json(buffer):
@@ -209,7 +209,7 @@ class View(object):
 class Index(object):
 
     def __init__(self):
-        raise TypeError('Cannot instanciate indexes')
+        raise TypeError('Cannot instantiate indexes')
 
     @staticmethod
     def from_json(buffer):
@@ -254,7 +254,7 @@ class Index(object):
 class ProguardView(object):
 
     def __init__(self):
-        raise TypeError('Cannot instanciate proguard views')
+        raise TypeError('Cannot instantiate proguard views')
 
     def _get_ptr(self):
         if not self._ptr:
@@ -279,7 +279,7 @@ class ProguardView(object):
         """Given a dotted path in the format ``class_name`` or
         ``class_name:method_name`` this performs an alias lookup.  For
         methods the line number must be supplied or the result is
-        unreliaable.
+        unreliable.
         """
         rv = None
         try:
