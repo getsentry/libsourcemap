@@ -8,11 +8,23 @@ from ._compat import to_bytes, xrange
 from .exceptions import SourceMapError, IndexedSourceMap, special_errors
 
 
+dtor_debug_callback = None
+
 _lib = _ffi.dlopen(os.path.join(os.path.dirname(__file__), '_libsourcemap.so'))
 
 
 Token = namedtuple('Token', ['dst_line', 'dst_col', 'src', 'src_line',
                              'src_col', 'src_id', 'name'])
+
+
+def silentdtor(orig):
+    def __del__(self):
+        try:
+            orig(self)
+        except Exception as err:
+            if dtor_debug_callback is not None:
+                dtor_debug_callback(self, err)
+    return __del__
 
 
 def rustcall(func, *args):
@@ -197,13 +209,11 @@ class View(object):
         for idx in xrange(len(self)):
             yield self[idx]
 
+    @silentdtor
     def __del__(self):
-        try:
-            if self._ptr:
-                _lib.lsm_view_free(self._ptr)
-            self._ptr = None
-        except Exception:
-            pass
+        if self._ptr:
+            _lib.lsm_view_free(self._ptr)
+        self._ptr = None
 
 
 class Index(object):
@@ -242,13 +252,11 @@ class Index(object):
         finally:
             self._ptr = None
 
+    @silentdtor
     def __del__(self):
-        try:
-            if self._ptr:
-                _lib.lsm_index_free(self._ptr)
-            self._ptr = None
-        except Exception:
-            pass
+        if self._ptr:
+            _lib.lsm_index_free(self._ptr)
+        self._ptr = None
 
 
 class ProguardView(object):
@@ -298,10 +306,8 @@ class ProguardView(object):
         rv._ptr = ptr
         return rv
 
+    @silentdtor
     def __del__(self):
-        try:
-            if self._ptr:
-                _lib.lsm_proguard_mapping_free(self._ptr)
-            self._ptr = None
-        except Exception:
-            pass
+        if self._ptr:
+            _lib.lsm_proguard_mapping_free(self._ptr)
+        self._ptr = None
