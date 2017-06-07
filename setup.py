@@ -72,6 +72,9 @@ if bdist_wheel is not None:
             bdist_wheel.finalize_options(self)
             self.python_tag = 'py2.py3'
             self.root_is_pure = False
+        def get_tag(self):
+            rv = bdist_wheel.get_tag(self)
+            return ('py2.py3', 'none') + rv[2:]
     cmdclass['bdist_wheel'] = CustomBdistWheel
 
 
