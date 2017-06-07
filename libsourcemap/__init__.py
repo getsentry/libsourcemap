@@ -1,4 +1,4 @@
-from .highlevel import from_json, View, Token, Index
+from .highlevel import from_json, View, Token, Index, ProguardView
 from .exceptions import SourceMapError, IndexedSourceMap, BadJson, \
     CannotFlatten, UnsupportedMemDbVersion, BadIo, MemDbDumpError, \
     TooManySources, TooManyNames, LocationOverflow, AlreadyMemDb

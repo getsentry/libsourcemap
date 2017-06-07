@@ -9,7 +9,8 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 sourcemap = "0.14.0"
-error-chain = "0.5.0"
+proguard = "0.1.0"
+error-chain = "^0.9.0"
 memmap = "0.4.0"
 brotli2 = "0.2.1"
 varinteger = "1.0.2"

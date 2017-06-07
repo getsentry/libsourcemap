@@ -1,14 +1,16 @@
 use std::io;
 use std::str::Utf8Error;
 
+use proguard;
 use sourcemap;
 
 
 error_chain! {
     foreign_links {
-        io::Error, IoError;
-        Utf8Error, Utf8Error;
-        sourcemap::Error, SourceMapError;
+        Io(io::Error);
+        Utf8(Utf8Error);
+        SourceMap(sourcemap::Error);
+        Proguard(proguard::Error);
     }
 
     errors {
