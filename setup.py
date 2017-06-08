@@ -5,6 +5,7 @@ import subprocess
 
 try:
     from wheel.bdist_wheel import bdist_wheel
+    from wheel.pep425tags import get_platform
 except ImportError:
     bdist_wheel = None
 
@@ -69,8 +70,11 @@ cmdclass = {
 if bdist_wheel is not None:
     class CustomBdistWheel(bdist_wheel):
         def get_tag(self):
-            rv = bdist_wheel.get_tag(self)
-            return ('py2.py3', 'none') + rv[2:]
+            plat_name = self.plat_name or get_platform()
+            if plat_name in ('linux-x86_64', 'linux_x86_64') and sys.maxsize == (1 << 31) - 1:
+                plat_name = 'linux_i686'
+            plat_name = plat_name.replace('-', '_').replace('.', '_')
+            return ('py2.py3', 'none', plat_name)
     cmdclass['bdist_wheel'] = CustomBdistWheel
 
 
