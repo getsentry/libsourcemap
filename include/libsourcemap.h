@@ -67,6 +67,7 @@ int lsm_view_or_index_from_json(char *bytes, unsigned int len,
                                 lsm_error_t *err);
 
 lsm_proguard_mapping_t *lsm_proguard_mapping_from_bytes(char *bytes, size_t len, lsm_error_t *err);
+lsm_proguard_mapping_t *lsm_proguard_mapping_from_path(char *filename, lsm_error_t *err);
 void lsm_proguard_mapping_free(lsm_proguard_mapping_t *view);
 int lsm_proguard_mapping_has_line_info(lsm_proguard_mapping_t *view, lsm_error_t *err);
 char *lsm_proguard_mapping_convert_dotted_path(

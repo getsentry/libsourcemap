@@ -2,9 +2,10 @@ use std::ptr;
 use std::mem;
 use std::slice;
 use std::panic;
-use std::ffi::CStr;
+use std::ffi::{CStr, OsStr};
 use std::borrow::Cow;
 use std::os::raw::{c_int, c_uint, c_char};
+use std::os::unix::ffi::OsStrExt;
 
 use proguard::MappingView;
 use sourcemap::Error as SourceMapError;
@@ -277,7 +278,14 @@ export!(lsm_view_or_index_from_json(
 export!(lsm_proguard_mapping_from_bytes(bytes: *const u8, len: c_uint)
     -> Result<*mut MappingView<'static>>
 {
-    resultbox(MappingView::from_slice(slice::from_raw_parts(bytes, len as usize))?)
+    resultbox(MappingView::from_vec(slice::from_raw_parts(bytes, len as usize).to_vec())?)
+});
+
+export!(lsm_proguard_mapping_from_path(filename: *const c_char)
+    -> Result<*mut MappingView<'static>>
+{
+    resultbox(MappingView::from_path(
+        OsStr::from_bytes(CStr::from_ptr(filename).to_bytes()))?)
 });
 
 export!(lsm_proguard_mapping_free(view: *mut MappingView) {
