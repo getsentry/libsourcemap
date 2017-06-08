@@ -68,10 +68,6 @@ cmdclass = {
 # be an API to do that, we just patch the internal function that wheel uses.
 if bdist_wheel is not None:
     class CustomBdistWheel(bdist_wheel):
-        def finalize_options(self):
-            bdist_wheel.finalize_options(self)
-            self.python_tag = 'py2.py3'
-            self.root_is_pure = False
         def get_tag(self):
             rv = bdist_wheel.get_tag(self)
             return ('py2.py3', 'none') + rv[2:]
