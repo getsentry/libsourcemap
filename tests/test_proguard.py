@@ -13,3 +13,15 @@ def test_basics():
 
     assert view.lookup('android.support.constraint.a.b:a', 116) \
         == 'android.support.constraint.solver.ArrayRow:createRowDefinition'
+
+
+def test_basics():
+    view = ProguardView.from_path('tests/fixtures/mapping.txt')
+
+    assert view.has_line_info
+
+    assert view.lookup('android.support.constraint.ConstraintLayout$a') \
+        == 'android.support.constraint.ConstraintLayout$LayoutParams'
+
+    assert view.lookup('android.support.constraint.a.b:a', 116) \
+        == 'android.support.constraint.solver.ArrayRow:createRowDefinition'

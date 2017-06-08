@@ -4,7 +4,7 @@ from contextlib import contextmanager
 from collections import namedtuple
 
 from ._sourcemapnative import ffi as _ffi
-from ._compat import to_bytes, xrange
+from ._compat import to_bytes, xrange, NULL_BYTE
 from .exceptions import SourceMapError, IndexedSourceMap, special_errors
 
 
@@ -276,6 +276,16 @@ class ProguardView(object):
         return ProguardView._from_ptr(rustcall(
             _lib.lsm_proguard_mapping_from_bytes,
             buffer, len(buffer)))
+
+    @staticmethod
+    def from_path(filename):
+        """Creates a sourcemap view from a file path."""
+        filename = to_bytes(filename)
+        if NULL_BYTE in filename:
+            raise ValueError('null byte in path')
+        return ProguardView._from_ptr(rustcall(
+            _lib.lsm_proguard_mapping_from_path,
+            filename + b'\x00'))
 
     @property
     def has_line_info(self):
