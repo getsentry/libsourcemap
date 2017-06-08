@@ -75,6 +75,13 @@ if bdist_wheel is not None:
                 plat_name = 'linux_i686'
             plat_name = plat_name.replace('-', '_').replace('.', '_')
             return ('py2.py3', 'none', plat_name)
+        def write_wheelfile(self, *args, **kwargs):
+            old = self.root_is_pure
+            self.root_is_pure = False
+            try:
+                return bdist_wheel.write_wheelfile(self, *args, **kwargs)
+            finally:
+                self.root_is_pure = old
     cmdclass['bdist_wheel'] = CustomBdistWheel
 
 
