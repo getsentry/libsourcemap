@@ -1,6 +1,5 @@
 tools:
   flake8:
     include:
-      #git: https://github.com/getsentry/calm-tools
-      #path: /flake8
-      path: /Users/mitsuhiko/Development/calm-tools/flake8
+      git: https://github.com/getsentry/calm-tools
+      path: /flake8
