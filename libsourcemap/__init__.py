@@ -5,7 +5,7 @@ from .exceptions import SourceMapError, IndexedSourceMap, BadJson, \
 
 __all__ = [
     # General stuff
-    'View', 'Index', 'Token', 'from_json',
+    'View', 'Index', 'Token', 'ProguardView', 'from_json',
 
     # Exceptions
     'SourceMapError', 'IndexedSourceMap', 'BadJson', 'CannotFlatten',

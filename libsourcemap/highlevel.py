@@ -1,6 +1,5 @@
 import os
 
-from contextlib import contextmanager
 from collections import namedtuple
 
 from ._sourcemapnative import ffi as _ffi
@@ -18,13 +17,13 @@ Token = namedtuple('Token', ['dst_line', 'dst_col', 'src', 'src_line',
 
 
 def silentdtor(orig):
-    def __del__(self):
+    def del_func(self):
         try:
             orig(self)
         except Exception as err:
             if dtor_debug_callback is not None:
                 dtor_debug_callback(self, err)
-    return __del__
+    return del_func
 
 
 def rustcall(func, *args):
@@ -73,7 +72,8 @@ def from_json(buffer, auto_flatten=True, raise_for_index=True):
     index_out = _ffi.new('lsm_index_t **')
 
     buffer = to_bytes(buffer)
-    rv = rustcall(_lib.lsm_view_or_index_from_json,
+    rv = rustcall(
+        _lib.lsm_view_or_index_from_json,
         buffer, len(buffer), view_out, index_out)
     if rv == 1:
         return View._from_ptr(view_out[0])
@@ -106,14 +106,16 @@ class View(object):
     def from_json(buffer):
         """Creates a sourcemap view from a JSON string."""
         buffer = to_bytes(buffer)
-        return View._from_ptr(rustcall(_lib.lsm_view_from_json,
+        return View._from_ptr(rustcall(
+            _lib.lsm_view_from_json,
             buffer, len(buffer)))
 
     @staticmethod
     def from_memdb(buffer):
         """Creates a sourcemap view from MemDB bytes."""
         buffer = to_bytes(buffer)
-        return View._from_ptr(rustcall(_lib.lsm_view_from_memdb,
+        return View._from_ptr(rustcall(
+            _lib.lsm_view_from_memdb,
             buffer, len(buffer)))
 
     @staticmethod
@@ -136,7 +138,8 @@ class View(object):
     def dump_memdb(self, with_source_contents=True, with_names=True):
         """Dumps a sourcemap in MemDB format into bytes."""
         len_out = _ffi.new('unsigned int *')
-        buf = rustcall(_lib.lsm_view_dump_memdb,
+        buf = rustcall(
+            _lib.lsm_view_dump_memdb,
             self._get_ptr(), len_out,
             with_source_contents, with_names)
         try:
@@ -158,8 +161,9 @@ class View(object):
             return convert_token(tok_out[0])
 
     def get_source_contents(self, src_id):
-        """Given a source ID this returns the embedded sourcecode if there is.
-        The sourcecode is returned as UTF-8 bytes for more efficient processing.
+        """Given a source ID this returns the embedded sourcecode if there
+        is.  The sourcecode is returned as UTF-8 bytes for more efficient
+        processing.
         """
         len_out = _ffi.new('unsigned int *')
         must_free = _ffi.new('int *')
@@ -225,7 +229,8 @@ class Index(object):
     def from_json(buffer):
         """Creates an index from a JSON string."""
         buffer = to_bytes(buffer)
-        return Index._from_ptr(rustcall(_lib.lsm_index_from_json,
+        return Index._from_ptr(rustcall(
+            _lib.lsm_index_from_json,
             buffer, len(buffer)))
 
     @staticmethod
@@ -247,7 +252,8 @@ class Index(object):
     def into_view(self):
         """Converts the index into a view"""
         try:
-            return View._from_ptr(rustcall(_lib.lsm_index_into_view,
+            return View._from_ptr(rustcall(
+                _lib.lsm_index_into_view,
                 self._get_ptr()))
         finally:
             self._ptr = None

@@ -15,7 +15,10 @@ if PY2:
 else:
     text_type = str
     xrange = range
-    implements_to_string = lambda x: x
+
+    def implements_to_string(self):
+        return self
+
     NULL_BYTE = 0
 
 
