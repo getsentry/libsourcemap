@@ -7,8 +7,10 @@ def test_dtors():
     original_dtor_debug_callback = highlevel.dtor_debug_callback
     try:
         failed = []
+
         def dtor_debug_callback(self, error):
             failed.append(error)
+
         highlevel.dtor_debug_callback = dtor_debug_callback
 
         class Foo(object):
@@ -21,7 +23,7 @@ def test_dtors():
             x = Foo()
             del x
             gc.collect()
-        except Exception as e:
+        except Exception:
             pass
         assert len(failed) == 1
         assert failed[0].args == ('Foo',)

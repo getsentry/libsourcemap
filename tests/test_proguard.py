@@ -15,7 +15,7 @@ def test_basics():
         == 'android.support.constraint.solver.ArrayRow:createRowDefinition'
 
 
-def test_basics():
+def test_from_path():
     view = ProguardView.from_path('tests/fixtures/mapping.txt')
 
     assert view.has_line_info

@@ -127,7 +127,9 @@ def test_memdb_dumping():
     nonames_mem_index = View.from_memdb(index.dump_memdb(
         with_names=False))
 
-    for t1, t2, t3 in zip(full_mem_index, nosource_mem_index, nonames_mem_index):
+    for t1, t2, t3 in zip(full_mem_index,
+                          nosource_mem_index,
+                          nonames_mem_index):
         if t1.name is None:
             continue
         assert t1.name == t2.name
