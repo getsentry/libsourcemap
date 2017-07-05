@@ -12,3 +12,5 @@ libsourcemap/_sourcemapnative.py
 .cargo
 *.pyc
 *.pyo
+.flake8
+.flake8-overrides
