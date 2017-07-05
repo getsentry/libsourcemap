@@ -12,7 +12,6 @@ except ImportError:
 from setuptools import setup, find_packages
 from distutils.command.build_py import build_py
 from distutils.command.build_ext import build_ext
-from setuptools.dist import Distribution
 
 
 # Build with clang if not otherwise specified.
@@ -69,12 +68,15 @@ cmdclass = {
 # be an API to do that, we just patch the internal function that wheel uses.
 if bdist_wheel is not None:
     class CustomBdistWheel(bdist_wheel):
+
         def get_tag(self):
             plat_name = self.plat_name or get_platform()
-            if plat_name in ('linux-x86_64', 'linux_x86_64') and sys.maxsize == (1 << 31) - 1:
+            if plat_name in ('linux-x86_64', 'linux_x86_64') \
+               and sys.maxsize == (1 << 31) - 1:
                 plat_name = 'linux_i686'
             plat_name = plat_name.replace('-', '_').replace('.', '_')
             return ('py2.py3', 'none', plat_name)
+
         def write_wheelfile(self, *args, **kwargs):
             old = self.root_is_pure
             self.root_is_pure = False
@@ -82,6 +84,7 @@ if bdist_wheel is not None:
                 return bdist_wheel.write_wheelfile(self, *args, **kwargs)
             finally:
                 self.root_is_pure = old
+
     cmdclass['bdist_wheel'] = CustomBdistWheel
 
 
