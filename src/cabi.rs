@@ -45,7 +45,7 @@ pub struct CError {
 fn get_error_code_from_kind(kind: &ErrorKind) -> c_int {
     match *kind {
         ErrorKind::SourceMap(SourceMapError::IndexedSourcemap) => 2,
-        ErrorKind::SourceMap(SourceMapError::BadJson(_, _, _)) => 3,
+        ErrorKind::SourceMap(SourceMapError::BadJson(_)) => 3,
         ErrorKind::SourceMap(SourceMapError::CannotFlatten(_)) => 4,
         ErrorKind::UnsupportedMemDbVersion => 5,
         ErrorKind::Io(_) => 6,
