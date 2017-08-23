@@ -4,12 +4,18 @@ except ImportError:
     izip = zip
 
 
-def get_fixtures(base):
+def get_fixtures(base, with_minified=False):
     with open('tests/fixtures/%s.js' % base, 'rb') as f:
         source = f.read()
     with open('tests/fixtures/%s.min.map' % base, 'rb') as f:
         min_map = f.read()
-    return source, min_map
+
+    if not with_minified:
+        return source, min_map
+
+    with open('tests/fixtures/%s.min.js' % base, 'rb') as f:
+        minified_source = f.read()
+    return source, minified_source, min_map
 
 
 def verify_index(index, source):
