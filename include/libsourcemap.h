@@ -36,6 +36,13 @@ unsigned int lsm_view_get_token(const lsm_view_t *view, unsigned int idx,
 int lsm_view_lookup_token(const lsm_view_t *view, unsigned int line,
                           unsigned int col, lsm_token_t *tok_out,
                           lsm_error_t *err);
+unsigned int lsm_view_get_original_function_name(const lsm_view_t *view,
+                                                 unsigned int line,
+                                                 unsigned int col,
+                                                 const char *minified_name,
+                                                 const char *minified_source,
+                                                 const char **name_out,
+                                                 lsm_error_t *err);
 unsigned int lsm_view_get_source_count(const lsm_view_t *view,\
                                        lsm_error_t *err);
 char *lsm_view_get_source_contents(const lsm_view_t *view,
