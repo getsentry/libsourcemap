@@ -169,6 +169,7 @@ class View(object):
         # Silently ignore underflows
         if line < 0 or col < 0:
             return None
+        minified_name = minified_name.encode('utf-8')
         sout = _ffi.new('const char **')
         slen = rustcall(_lib.lsm_view_get_original_function_name,
                         self._get_ptr(), line, col, minified_name,
