@@ -8,7 +8,7 @@ def test_stacktrace():
     view = View.from_json(min_map)
 
     stacktrace = [
-        (0, 63, 'e', 'onFailure'),
+        (0, 63, u'e', 'onFailure'),
         (0, 135, 'r', 'invoke'),
         (0, 182, 'i', 'test'),
         (0, 244, 'nonexisting', None),
