@@ -8,7 +8,7 @@ name = "libsourcemap"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-sourcemap = "0.14.0"
+sourcemap = "1.1.0"
 proguard = "0.1.0"
 error-chain = "^0.9.0"
 memmap = "0.4.0"

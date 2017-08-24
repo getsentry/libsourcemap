@@ -160,6 +160,22 @@ class View(object):
                     line, col, tok_out):
             return convert_token(tok_out[0])
 
+    def get_original_function_name(self, line, col, minified_name,
+                                   minified_source):
+        """Given a token location and a minified function name and the
+        minified source file this returns the original function name if it
+        can be found of the minified function in scope.
+        """
+        # Silently ignore underflows
+        if line < 0 or col < 0:
+            return None
+        sout = _ffi.new('const char **')
+        slen = rustcall(_lib.lsm_view_get_original_function_name,
+                        self._get_ptr(), line, col, minified_name,
+                        minified_source, sout)
+        if slen > 0:
+            return _ffi.unpack(sout[0], slen).decode('utf-8', 'replace')
+
     def get_source_contents(self, src_id):
         """Given a source ID this returns the embedded sourcecode if there
         is.  The sourcecode is returned as UTF-8 bytes for more efficient

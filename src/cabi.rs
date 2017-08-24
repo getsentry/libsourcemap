@@ -33,6 +33,13 @@ pub struct Token {
     pub src_id: c_uint,
 }
 
+#[derive(Debug)]
+#[repr(C)]
+pub struct Str {
+    pub data: *const u8,
+    pub len: c_uint,
+}
+
 
 #[derive(Debug)]
 #[repr(C)]
@@ -45,7 +52,7 @@ pub struct CError {
 fn get_error_code_from_kind(kind: &ErrorKind) -> c_int {
     match *kind {
         ErrorKind::SourceMap(SourceMapError::IndexedSourcemap) => 2,
-        ErrorKind::SourceMap(SourceMapError::BadJson(_, _, _)) => 3,
+        ErrorKind::SourceMap(SourceMapError::BadJson(_)) => 3,
         ErrorKind::SourceMap(SourceMapError::CannotFlatten(_)) => 4,
         ErrorKind::UnsupportedMemDbVersion => 5,
         ErrorKind::Io(_) => 6,
@@ -173,6 +180,22 @@ export!(lsm_view_lookup_token(
             set_token(out, &tm);
             1
         }
+    })
+});
+
+export!(lsm_view_get_original_function_name(
+        view: *const View, line: c_uint, col: c_uint, minified_name: *const c_char,
+        minified_source: *const c_char, name_out: *mut *const c_char) -> Result<c_uint>
+{
+    Ok(match (*view).get_original_function_name(
+        line as u32, col as u32, CStr::from_ptr(minified_name).to_str()?,
+        CStr::from_ptr(minified_source).to_str()?)
+    {
+        Some(name) => {
+            *name_out = name.as_ptr() as *const c_char;
+            name.len() as c_uint
+        }
+        None => 0
     })
 });
 

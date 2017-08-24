@@ -118,6 +118,18 @@ impl View {
         None
     }
 
+    pub fn get_original_function_name(&self, line: u32, col: u32, minified_name: &str,
+                                      minified_source: &str) -> Option<&str> {
+        match self.map {
+            MapRepr::Json(ref sm) => {
+                sm.get_original_function_name(line, col, minified_name, minified_source)
+            }
+            // mem reprs of sourcemaps currently do not support getting the original function names
+            // for this we would ideally embed that derived information right in the file.
+            MapRepr::Mem(_) => None,
+        }
+    }
+
     pub fn get_source_contents<'a>(&'a self, src_id: u32) -> Option<Cow<'a, str>> {
         match self.map {
             MapRepr::Json(ref sm) => {
