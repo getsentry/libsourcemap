@@ -171,11 +171,18 @@ class View(object):
             return None
         minified_name = minified_name.encode('utf-8')
         sout = _ffi.new('const char **')
-        slen = rustcall(_lib.lsm_view_get_original_function_name,
-                        self._get_ptr(), line, col, minified_name,
-                        minified_source, sout)
-        if slen > 0:
-            return _ffi.unpack(sout[0], slen).decode('utf-8', 'replace')
+        try:
+            slen = rustcall(_lib.lsm_view_get_original_function_name,
+                            self._get_ptr(), line, col, minified_name,
+                            minified_source, sout)
+            if slen > 0:
+                return _ffi.unpack(sout[0], slen).decode('utf-8', 'replace')
+        except SourceMapError:
+            # In some rare cases the library is/was known to panic.  We do
+            # not want to report this upwards  (this happens on slicing
+            # out of range on older rust versions in the rust-sourcemap
+            # library)
+            pass
 
     def get_source_contents(self, src_id):
         """Given a source ID this returns the embedded sourcecode if there
