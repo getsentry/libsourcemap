@@ -95,11 +95,23 @@ unsafe fn notify_err(err: Error, err_out: *mut CError) {
 unsafe fn landingpad<F: FnOnce() -> Result<T> + panic::UnwindSafe, T>(
     f: F, err_out: *mut CError) -> T
 {
-    if let Ok(rv) = panic::catch_unwind(f) {
-        rv.map_err(|err| notify_err(err, err_out)).unwrap_or(mem::zeroed())
-    } else {
-        notify_err(ErrorKind::InternalError.into(), err_out);
-        mem::zeroed()
+    match panic::catch_unwind(f) {
+        Ok(rv) => rv.map_err(|err| notify_err(err, err_out)).unwrap_or(mem::zeroed()),
+        Err(err) => {
+            use std::any::Any;
+            let err = &*err as &Any;
+            let msg = match err.downcast_ref::<&'static str>() {
+                Some(s) => *s,
+                None => {
+                    match err.downcast_ref::<String>() {
+                        Some(s) => &**s,
+                        None => "Box<Any>",
+                    }
+                }
+            };
+            notify_err(ErrorKind::InternalError(msg.to_string()).into(), err_out);
+            mem::zeroed()
+        }
     }
 }
 

@@ -14,8 +14,9 @@ error_chain! {
     }
 
     errors {
-        InternalError {
+        InternalError(msg: String) {
             description("Internal library error")
+            display("Internal library error: {}", &msg)
         }
         UnsupportedMemDbVersion {
             description("Unsupported memdb version")
