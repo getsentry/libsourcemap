@@ -1,3 +1,10 @@
+**DEPRECATED**
+
+This library has been deprecated in favor of [Symbolic](https://github.com/getsentry/symbolic)
+
+----------
+
+
 # libsourcemap
 
 This project implements efficient sourcemap handling in Rust and wraps
